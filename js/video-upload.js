@@ -230,7 +230,7 @@ class VideoUploadController {
       duration: durationSeconds,
       durationFormatted: durationFormatted,
       thumbnail: thumbnail,
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+      videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4'
     };
 
     // Update UI Preview
@@ -384,7 +384,7 @@ class VideoUploadController {
         duration: 1122,
         durationFormatted: '18:42',
         thumbnail: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=600&auto=format&fit=crop&q=80',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+        videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4'
       },
       'jobs': {
         type: 'youtube',
@@ -393,7 +393,7 @@ class VideoUploadController {
         duration: 904,
         durationFormatted: '15:04',
         thumbnail: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600&auto=format&fit=crop&q=80',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'
+        videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4'
       },
       'altman': {
         type: 'upload',
@@ -402,7 +402,7 @@ class VideoUploadController {
         duration: 2535,
         durationFormatted: '42:15',
         thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+        videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4'
       },
       'gaming': {
         type: 'upload',
@@ -411,7 +411,7 @@ class VideoUploadController {
         duration: 480,
         durationFormatted: '08:00',
         thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'
+        videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4'
       }
     };
 

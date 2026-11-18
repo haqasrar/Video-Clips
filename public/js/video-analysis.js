@@ -427,7 +427,7 @@ class VideoAnalysisEngine {
       durationFormatted: sourceData.durationFormatted || '10:00',
       createdAt: new Date().toISOString(),
       thumbnail: sourceData.thumbnail || 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=600&auto=format&fit=crop&q=80',
-      videoUrl: sourceData.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      videoUrl: sourceData.videoUrl || 'https://vjs.zencdn.net/v/oceans.mp4',
       clipsCount: clips.length,
       highestScore: clips[0] ? clips[0].viralScore : 0,
       clips: clips

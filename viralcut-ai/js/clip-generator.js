@@ -372,8 +372,8 @@ class ClipGenerator {
 
     // Set Video Source
     if (this.editorVideo) {
-      this.editorVideo.src = project.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-      this.editorVideo.currentTime = clip.startTime;
+      this.editorVideo.src = project.videoUrl || 'https://vjs.zencdn.net/v/oceans.mp4';
+      this.editorVideo.currentTime = clip.startTime || 0;
       this.editorVideo.play().catch(e => console.log('Autoplay prevented:', e));
     }
 
@@ -565,22 +565,38 @@ class ClipGenerator {
     if (clip) this.downloadClipVideo(clip);
   }
 
-  downloadClipVideo(clip) {
-    window.app.showToast(`Rendering clip "${clip.title.slice(0, 24)}..." for download`, 'info');
+  async downloadClipVideo(clip) {
+    window.app.showToast(`Preparing download for: "${clip.title.slice(0, 24)}..."`, 'info');
 
-    // Simulate media file download trigger
-    const videoUrl = this.currentProject.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    const videoUrl = this.currentProject.videoUrl || 'https://vjs.zencdn.net/v/oceans.mp4';
+    const fileName = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.mp4`;
+
+    try {
+      const response = await fetch(videoUrl);
+      if (response.ok) {
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        window.app.showToast(`Downloaded clip: ${clip.title.slice(0, 24)}`, 'success');
+        return;
+      }
+    } catch (e) {
+      console.warn('Direct blob fetch error, falling back to download anchor:', e);
+    }
+
     const a = document.createElement('a');
     a.href = videoUrl;
-    a.download = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${clip.aspectRatio || '9x16'}.mp4`;
-    a.target = '_blank';
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-
-    setTimeout(() => {
-      window.app.showToast(`Downloaded clip: ${clip.title.slice(0, 24)}`, 'success');
-    }, 1200);
+    window.app.showToast(`Downloaded clip: ${clip.title.slice(0, 24)}`, 'success');
   }
 
   downloadSubtitlesSRT(clip) {
