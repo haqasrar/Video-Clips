@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c0e17"/>
+      <stop offset="50%" stop-color="#161a2b"/>
+      <stop offset="100%" stop-color="#08090e"/>
+    </linearGradient>
+    <linearGradient id="neonGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#bgGrad)"/>
+  <circle cx="400" cy="225" r="90" fill="url(#neonGlow)" opacity="0.15" filter="blur(30px)"/>
+  <circle cx="400" cy="225" r="45" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+  <polygon points="392,210 416,225 392,240" fill="#ffffff"/>
+  <text x="400" y="310" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="16" font-weight="600">ViralCut AI Video Stream</text>
+</svg>
