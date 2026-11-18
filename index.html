@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ViralCut AI – AI-Powered Viral Video Clip Generator</title>
+  <meta name="description" content="Turn long-form YouTube videos and uploads into high-retention viral short clips ranked by AI viral potential.">
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Core Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Lucide Icons via CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- ======================================================================
+         Sidebar Navigation
+         ====================================================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="#dashboard" class="brand-logo">
+          <div class="logo-icon">
+            <i data-lucide="scissors"></i>
+          </div>
+          <div class="logo-text">Viral<span>Cut</span> AI</div>
+        </a>
+        <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar">
+          <i data-lucide="chevron-left"></i>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Studio Menu</div>
+        <a href="#dashboard" class="nav-link active" data-view="dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="#create" class="nav-link" data-view="create">
+          <i data-lucide="sparkles"></i>
+          <span>Create Clips</span>
+          <span class="nav-badge">AI</span>
+        </a>
+        <a href="#projects" class="nav-link" data-view="projects">
+          <i data-lucide="folder-kanban"></i>
+          <span>My Projects</span>
+        </a>
+        <a href="#library" class="nav-link" data-view="library">
+          <i data-lucide="film"></i>
+          <span>Clip Library</span>
+        </a>
+
+        <div class="nav-section-title" style="margin-top: 1rem;">System</div>
+        <a href="#settings" class="nav-link" data-view="settings">
+          <i data-lucide="sliders"></i>
+          <span>Settings</span>
+        </a>
+        <a href="#help" class="nav-link" data-view="help">
+          <i data-lucide="help-circle"></i>
+          <span>Help & Support</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Footer / Free & Unlimited Access & Backend Status -->
+      <div class="sidebar-footer">
+        <div class="free-unlimited-pill" style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); margin-bottom: 0.85rem;">
+          <span style="font-size: 0.8rem; font-weight: 700; color: var(--accent-emerald); display: flex; align-items: center; gap: 0.4rem;">
+            <i data-lucide="infinity" style="width: 16px; height: 16px;"></i> Unlimited Access
+          </span>
+          <span style="font-size: 0.7rem; font-weight: 800; color: #fff; background: var(--accent-emerald); padding: 0.15rem 0.5rem; border-radius: var(--radius-full);">FREE</span>
+        </div>
+
+        <div class="backend-status-pill" id="backendStatusPill" title="Backend Connection State">
+          <span class="status-dot" id="backendStatusDot"></span>
+          <span id="backendStatusText">AI Backend Connected</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         Main Wrapper & Topbar
+         ====================================================================== -->
+    <div class="main-wrapper">
+      <!-- Sticky Topbar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="sidebar-toggle-btn" id="mobileMenuBtn" style="display: none;">
+            <i data-lucide="menu"></i>
+          </button>
+          <div class="page-title-badge">
+            <i data-lucide="zap"></i>
+            <span id="topbarPageTitle">Dashboard Overview</span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button class="btn btn-secondary btn-sm" onclick="app.navigateTo('create')">
+            <i data-lucide="video"></i>
+            <span>Upload Video</span>
+          </button>
+          <button class="btn btn-primary btn-sm btn-glow" onclick="app.navigateTo('create')">
+            <i data-lucide="sparkles"></i>
+            <span>Create New Clips</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Dynamic Content Views -->
+      <main class="content-body">
+        
+        <!-- ==================================================================
+             VIEW 1: Dashboard
+             ================================================================== -->
+        <section class="view-section active" id="view-dashboard">
+          <!-- Hero Banner -->
+          <div class="dashboard-hero">
+            <div class="hero-content">
+              <div class="hero-badge-tag">
+                <i data-lucide="flame"></i> Powered by Multi-Modal Viral Retention AI
+              </div>
+              <h1>Turn Long Videos Into <span class="gradient-text">Viral Short Clips</span> In Seconds</h1>
+              <p>
+                Analyze hours of video or YouTube links. Our AI scores hooks, detects speech emotion, automatically crops to 9:16 vertical, and generates animated captions.
+              </p>
+              <div class="hero-actions">
+                <button class="btn btn-primary btn-lg" id="dashboardCreateClipsBtn">
+                  <i data-lucide="sparkles"></i>
+                  <span>Create New Clips</span>
+                </button>
+                <button class="btn btn-secondary btn-lg" onclick="videoUploadController.loadPresetSample('hormozi')">
+                  <i data-lucide="play-circle"></i>
+                  <span>Try Sample Video</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metrics Grid -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-card-top">
+                <div class="metric-icon-wrap purple">
+                  <i data-lucide="video"></i>
+                </div>
+                <div class="metric-trend up">
+                  <i data-lucide="arrow-up-right"></i> +18%
+                </div>
+              </div>
+              <div class="metric-value" id="metricTotalVideos">0</div>
+              <div class="metric-label">Total Videos Analyzed</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-card-top">
+                <div class="metric-icon-wrap cyan">
+                  <i data-lucide="film"></i>
+                </div>
+                <div class="metric-trend up">
+                  <i data-lucide="arrow-up-right"></i> +0%
+                </div>
+              </div>
+              <div class="metric-value" id="metricTotalClips">0</div>
+              <div class="metric-label">Total Viral Clips Generated</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-card-top">
+                <div class="metric-icon-wrap emerald">
+                  <i data-lucide="zap"></i>
+                </div>
+                <div class="metric-trend up">
+                  <i data-lucide="arrow-up-right"></i> +0%
+                </div>
+              </div>
+              <div class="metric-value" id="metricAvgScore">0/100</div>
+              <div class="metric-label">Average Viral Potential Score</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-card-top">
+                <div class="metric-icon-wrap blue">
+                  <i data-lucide="clock"></i>
+                </div>
+                <div class="metric-trend up">
+                  <i data-lucide="arrow-up-right"></i> Instant
+                </div>
+              </div>
+              <div class="metric-value" id="metricTimeSaved">0 hrs</div>
+              <div class="metric-label">Editing Time Saved</div>
+            </div>
+          </div>
+
+          <!-- Split: Top Viral Clips Spotlight & Recent Projects -->
+          <div class="dashboard-content-split">
+            <!-- Left: Top Clip Spotlight -->
+            <div>
+              <div class="section-header-row">
+                <h2><i data-lucide="crown" style="color: #fbbf24;"></i> Most Successful Viral Clip</h2>
+                <button class="btn btn-ghost btn-sm" onclick="app.navigateTo('library')">
+                  <span>View All Clips</span>
+                  <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+              <div id="dashboardSpotlightContainer">
+                <!-- Dynamically rendered by dashboard.js -->
+              </div>
+            </div>
+
+            <!-- Right: Recent Projects -->
+            <div>
+              <div class="section-header-row">
+                <h2><i data-lucide="history"></i> Recent Projects</h2>
+                <button class="btn btn-ghost btn-sm" onclick="app.navigateTo('projects')">
+                  <span>All Projects</span>
+                  <i data-lucide="arrow-right"></i>
+                </button>
+              </div>
+              <div class="projects-container-card" id="recentProjectsContainer">
+                <!-- Dynamically rendered by dashboard.js -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 2: Create Clips (Video Input & Options)
+             ================================================================== -->
+        <section class="view-section" id="view-create">
+          <div class="create-wrapper">
+            <div class="create-header">
+              <h1>Generate Viral Video Clips</h1>
+              <p>Paste a YouTube video URL or upload your footage. Our AI pinpoints emotional peaks, scores virality, and cuts high-converting shorts.</p>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="input-tabs-nav">
+              <button class="input-tab-btn active" data-tab="url">
+                <i data-lucide="link"></i>
+                <span>Option A: Paste Video URL</span>
+              </button>
+              <button class="input-tab-btn" data-tab="upload">
+                <i data-lucide="upload-cloud"></i>
+                <span>Option B: Upload Video</span>
+              </button>
+            </div>
+
+            <!-- Main Input Card -->
+            <div class="input-main-card">
+              <!-- Tab A: URL Input -->
+              <div class="input-tab-content active" id="tab-url">
+                <div class="url-input-group">
+                  <div class="input-with-icon">
+                    <i data-lucide="youtube"></i>
+                    <input type="text" id="videoUrlInput" class="text-input" placeholder="Paste YouTube video URL (e.g. https://www.youtube.com/watch?v=...)" />
+                  </div>
+                  <button class="btn btn-secondary" id="fetchUrlBtn">
+                    <i data-lucide="check"></i>
+                    <span>Validate URL</span>
+                  </button>
+                </div>
+
+                <!-- URL Preview Card -->
+                <div class="video-preview-card" id="urlPreviewCard">
+                  <div class="video-preview-inner">
+                    <img id="urlPreviewThumb" class="video-preview-thumb" src="" alt="Thumbnail" />
+                    <div class="video-preview-details">
+                      <div class="video-preview-title" id="urlPreviewTitle">Imported YouTube Stream</div>
+                      <div class="video-preview-tags" id="urlPreviewMeta"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab B: Drag & Drop Upload -->
+              <div class="input-tab-content" id="tab-upload">
+                <div class="dropzone-area" id="dropzone">
+                  <input type="file" id="videoFileInput" accept="video/mp4,video/quicktime,video/webm" style="display: none;" />
+                  <div class="dropzone-icon-circle">
+                    <i data-lucide="upload-cloud" style="width: 32px; height: 32px;"></i>
+                  </div>
+                  <div class="dropzone-title">Drag & drop your video file here</div>
+                  <div class="dropzone-subtitle">or click anywhere to browse from your computer</div>
+                  <div class="dropzone-formats">
+                    <span class="format-tag">MP4</span>
+                    <span class="format-tag">MOV</span>
+                    <span class="format-tag">WebM</span>
+                    <span class="format-tag">Up to 2GB</span>
+                  </div>
+                </div>
+
+                <!-- Upload Progress -->
+                <div class="upload-progress-card" id="uploadProgressCard">
+                  <div class="upload-file-info">
+                    <span id="uploadFileName" style="font-weight: 700;">video.mp4</span>
+                    <span id="uploadProgressPercent" style="color: var(--accent-cyan); font-weight: 800;">0%</span>
+                  </div>
+                  <div class="upload-progress-bar-bg">
+                    <div class="upload-progress-bar-fill" id="uploadProgressBar"></div>
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--text-dim);" id="uploadFileSize">0 MB</div>
+                </div>
+
+                <!-- Upload Finished Preview Card -->
+                <div class="video-preview-card" id="uploadPreviewCard">
+                  <div class="video-preview-inner">
+                    <img id="uploadPreviewThumb" class="video-preview-thumb" src="" alt="Thumbnail" />
+                    <div class="video-preview-details">
+                      <div class="video-preview-title" id="uploadPreviewTitle">Local Upload</div>
+                      <div class="video-preview-tags" id="uploadPreviewMeta"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Preset Samples Quick Click -->
+              <div class="presets-section">
+                <div class="presets-label">
+                  <i data-lucide="zap"></i> Or try one-click demo presets:
+                </div>
+                <div class="presets-grid">
+                  <div class="preset-chip" data-sample="hormozi">
+                    <img class="preset-thumb" src="https://images.unsplash.com/photo-1557804506-669a67965ba0?w=200&auto=format&fit=crop&q=80" alt="Hormozi" />
+                    <div>
+                      <div class="preset-chip-title">Alex Hormozi Podcast</div>
+                      <div class="preset-chip-desc">18:42 • Business Strategy</div>
+                    </div>
+                  </div>
+                  <div class="preset-chip" data-sample="jobs">
+                    <img class="preset-thumb" src="https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=200&auto=format&fit=crop&q=80" alt="Jobs" />
+                    <div>
+                      <div class="preset-chip-title">Steve Jobs Stanford</div>
+                      <div class="preset-chip-desc">15:04 • Motivation Speech</div>
+                    </div>
+                  </div>
+                  <div class="preset-chip" data-sample="altman">
+                    <img class="preset-thumb" src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80" alt="Altman" />
+                    <div>
+                      <div class="preset-chip-title">Sam Altman AI Debate</div>
+                      <div class="preset-chip-desc">42:15 • Tech Keynote</div>
+                    </div>
+                  </div>
+                  <div class="preset-chip" data-sample="gaming">
+                    <img class="preset-thumb" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=200&auto=format&fit=crop&q=80" alt="Gaming" />
+                    <div>
+                      <div class="preset-chip-title">Esports Championship</div>
+                      <div class="preset-chip-desc">08:00 • Gaming Clutch</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Clip Generation Preferences Card -->
+            <div class="config-card">
+              <div class="config-title">
+                <i data-lucide="sliders"></i>
+                <span>Clip Generation & AI Parameters</span>
+              </div>
+
+              <div class="config-grid">
+                <!-- Target Duration -->
+                <div class="config-field">
+                  <label>Target Clip Duration</label>
+                  <div class="segmented-control">
+                    <div class="segmented-option duration" data-value="15">15s</div>
+                    <div class="segmented-option duration active" data-value="30">30s</div>
+                    <div class="segmented-option duration" data-value="45">45s</div>
+                    <div class="segmented-option duration" data-value="60">60s</div>
+                  </div>
+                </div>
+
+                <!-- Aspect Ratio -->
+                <div class="config-field">
+                  <label>Aspect Ratio Crop</label>
+                  <div class="segmented-control">
+                    <div class="segmented-option ratio active" data-value="9:16">9:16 (Shorts/Reels)</div>
+                    <div class="segmented-option ratio" data-value="16:9">16:9 (Landscape)</div>
+                    <div class="segmented-option ratio" data-value="1:1">1:1 (Square)</div>
+                  </div>
+                </div>
+
+                <!-- Caption Style -->
+                <div class="config-field">
+                  <label for="configCaptionStyle">Dynamic Caption Animation</label>
+                  <select id="configCaptionStyle" class="select-input">
+                    <option value="hormozi" selected>Hormozi / MrBeast Pop (Yellow/Green)</option>
+                    <option value="clean">Minimalist Pill (White / Dark Backing)</option>
+                    <option value="cyber">Cyberpunk Glow (Cyan / Neon)</option>
+                  </select>
+                </div>
+
+                <!-- AI Focus Mode -->
+                <div class="config-field">
+                  <label for="configFocusMode">AI Virality Focus</label>
+                  <select id="configFocusMode" class="select-input">
+                    <option value="highest_viral" selected>Highest Overall Viral Potential</option>
+                    <option value="humor">Funny & Surprising Statements</option>
+                    <option value="educational">Important Insights & Education</option>
+                    <option value="motivational">Emotional & Motivational</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="margin-top: 1.25rem;">
+                <div class="toggle-row">
+                  <div>
+                    <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Smart Background Lo-Fi Music</div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted);">Dynamically duck music volume under speech</div>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="configAutoMusic" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Main Analyze Video Button -->
+              <div class="analyze-action-bar">
+                <button class="btn-analyze-super" id="startAnalysisBtn">
+                  <i data-lucide="sparkles"></i>
+                  <span>Analyze Video & Generate Viral Clips</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 3: Viral Clip Ranking System (Results View)
+             ================================================================== -->
+        <section class="view-section" id="view-results">
+          <!-- Source Info Banner -->
+          <div class="results-header-banner">
+            <div class="results-source-info">
+              <img id="resultsSourceThumb" class="results-source-thumb" src="" alt="Thumbnail" />
+              <div class="results-source-title">
+                <h2 id="resultsSourceTitle">Video Title</h2>
+                <div class="results-source-meta" id="resultsSourceMeta"></div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem;">
+              <button class="btn btn-secondary" onclick="app.navigateTo('create')">
+                <i data-lucide="plus-circle"></i>
+                <span>Analyze Another Video</span>
+              </button>
+              <button class="btn btn-primary" id="downloadAllClipsBtn">
+                <i data-lucide="download-cloud"></i>
+                <span>Download All Clips</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Controls: Viral Tier Filters -->
+          <div class="results-controls-row">
+            <div class="filter-group">
+              <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-right: 0.5rem;">
+                Filter by Score:
+              </span>
+              <button class="filter-btn filter-tier-btn active" data-tier="all">All Clips</button>
+              <button class="filter-btn filter-tier-btn" data-tier="90">🔥 90+ Extremely High</button>
+              <button class="filter-btn filter-tier-btn" data-tier="80">⚡ 80-89 Very High</button>
+              <button class="filter-btn filter-tier-btn" data-tier="70">✨ 70-79 High</button>
+            </div>
+
+            <div style="font-size: 0.85rem; color: var(--text-dim);">
+              <i data-lucide="info" style="width: 14px; height: 14px; display: inline;"></i> Clips automatically ranked: Highest viral potential appears <strong>FIRST</strong>.
+            </div>
+          </div>
+
+          <!-- Ranked Clips Grid -->
+          <div class="clips-ranked-grid" id="rankedClipsContainer">
+            <!-- Dynamically populated by clip-generator.js -->
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 4: My Projects
+             ================================================================== -->
+        <section class="view-section" id="view-projects">
+          <div class="section-header-row">
+            <div>
+              <h2><i data-lucide="folder-kanban"></i> My Projects</h2>
+              <p>Manage, reopen, and export your previous video analysis sessions.</p>
+            </div>
+            <button class="btn btn-primary" onclick="app.navigateTo('create')">
+              <i data-lucide="plus"></i>
+              <span>New Video Analysis</span>
+            </button>
+          </div>
+
+          <!-- Search & Sort Filter Bar -->
+          <div class="projects-filter-bar">
+            <div class="search-input-wrap">
+              <i data-lucide="search"></i>
+              <input type="text" id="projectsSearchInput" class="text-input" placeholder="Search projects by title..." />
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Sort By:</span>
+              <select id="projectsSortSelect" class="select-input">
+                <option value="newest" selected>Date: Newest First</option>
+                <option value="oldest">Date: Oldest First</option>
+                <option value="score">Highest Viral Score</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Projects Grid -->
+          <div class="projects-cards-grid" id="projectsGrid">
+            <!-- Dynamically populated by app.js -->
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 5: Clip Library
+             ================================================================== -->
+        <section class="view-section" id="view-library">
+          <div class="section-header-row">
+            <div>
+              <h2><i data-lucide="film"></i> Universal Clip Library</h2>
+              <p>Search and manage all generated short clips across every video project.</p>
+            </div>
+          </div>
+
+          <!-- Filters Bar -->
+          <div class="projects-filter-bar">
+            <div class="search-input-wrap">
+              <i data-lucide="search"></i>
+              <input type="text" id="librarySearchInput" class="text-input" placeholder="Search clips by keywords, hashtags..." />
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+              <select id="libraryPlatformFilter" class="select-input">
+                <option value="all" selected>All Platforms</option>
+                <option value="tiktok">TikTok</option>
+                <option value="shorts">YouTube Shorts</option>
+                <option value="reels">Instagram Reels</option>
+              </select>
+
+              <select id="libraryTierFilter" class="select-input">
+                <option value="all" selected>All Viral Tiers</option>
+                <option value="90">90+ Extremely High</option>
+                <option value="80">80-89 Very High</option>
+                <option value="70">70-79 High</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="projects-cards-grid" id="libraryGrid">
+            <!-- Dynamically populated by app.js -->
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 6: Settings & Integration
+             ================================================================== -->
+        <section class="view-section" id="view-settings">
+          <div class="settings-container">
+            <div class="section-header-row">
+              <div>
+                <h2><i data-lucide="sliders"></i> Platform Settings & API</h2>
+                <p>Configure defaults, AI parameters, and future-ready backend integration.</p>
+              </div>
+            </div>
+
+            <!-- Clip Defaults -->
+            <div class="settings-card">
+              <div class="settings-card-title">
+                <i data-lucide="video"></i> Clip Generation Defaults
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <h4>Default Clip Duration</h4>
+                  <p>Initial duration for automatically generated viral segments.</p>
+                </div>
+                <select id="settingDefaultDuration" class="select-input" style="width: 160px;">
+                  <option value="15">15 Seconds</option>
+                  <option value="30" selected>30 Seconds</option>
+                  <option value="45">45 Seconds</option>
+                  <option value="60">60 Seconds</option>
+                </select>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <h4>Default Video Aspect Ratio</h4>
+                  <p>Choose optimal framing for TikTok, Shorts or YouTube widescreen.</p>
+                </div>
+                <select id="settingDefaultRatio" class="select-input" style="width: 160px;">
+                  <option value="9:16" selected>9:16 (Vertical)</option>
+                  <option value="16:9">16:9 (Landscape)</option>
+                  <option value="1:1">1:1 (Square)</option>
+                </select>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <h4>Default Caption Aesthetic</h4>
+                  <p>Visual font and animated word-by-word highlighting style.</p>
+                </div>
+                <select id="settingCaptionStyle" class="select-input" style="width: 220px;">
+                  <option value="hormozi" selected>Hormozi / MrBeast Pop</option>
+                  <option value="clean">Minimalist Pill</option>
+                  <option value="cyber">Cyberpunk Glow</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Backend Integration -->
+            <div class="settings-card">
+              <div class="settings-card-title">
+                <i data-lucide="cpu"></i> AI Backend Integration Architecture
+              </div>
+              <p style="margin-bottom: 1.25rem;">
+                ViralCut AI is fully prepared for Python Flask / Node.js backend integration with FFmpeg & Whisper.
+              </p>
+
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <h4>Connect to Live Backend Server</h4>
+                  <p>Toggle between frontend simulation mode and actual API server processing.</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="settingUseRealBackend" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <h4>Backend API Base URL</h4>
+                  <p>Target server endpoint hosting <code>/api/video/analyze</code></p>
+                </div>
+                <input type="text" id="settingApiUrl" class="text-input" style="width: 260px;" value="http://localhost:5000" />
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <h4>API Key (Optional)</h4>
+                  <p>Bearer authentication token for backend endpoints.</p>
+                </div>
+                <input type="password" id="settingApiKey" class="text-input" style="width: 260px;" placeholder="sk_live_..." />
+              </div>
+
+              <div style="margin-top: 1.25rem; display: flex; gap: 1rem; align-items: center;">
+                <button class="btn btn-secondary" id="testBackendConnectionBtn">
+                  <i data-lucide="radio"></i> Test Backend Connection
+                </button>
+                <button class="btn btn-primary" id="saveSettingsBtn">
+                  <i data-lucide="save"></i> Save Settings
+                </button>
+              </div>
+            </div>
+
+            <!-- Storage & Backup -->
+            <div class="settings-card">
+              <div class="settings-card-title">
+                <i data-lucide="database"></i> Data & Storage Management
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <h4>Reset to Default Demo Data</h4>
+                  <p>Re-seeds high-performing video projects and sample clips.</p>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="resetDemoDataBtn">
+                  <i data-lucide="refresh-cw"></i> Reset Demo Data
+                </button>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <h4>Export / Import JSON Database</h4>
+                  <p>Backup all projects, metadata, and clips to a single JSON file.</p>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                  <button class="btn btn-secondary btn-sm" id="exportDataBtn">
+                    <i data-lucide="download"></i> Export JSON
+                  </button>
+                  <label class="btn btn-secondary btn-sm" style="cursor: pointer;">
+                    <i data-lucide="upload"></i> Import JSON
+                    <input type="file" id="importDataInput" accept=".json" style="display: none;" />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 7: Help & Support
+             ================================================================== -->
+        <section class="view-section" id="view-help">
+          <div class="help-hero">
+            <h1>ViralCut AI Knowledge Base</h1>
+            <p>Everything you need to know about viral retention algorithms, hook detection, and clip generation.</p>
+          </div>
+
+          <div class="faq-list">
+            <div class="faq-item open">
+              <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+                <span>How does the AI calculate Viral Potential Scores?</span>
+                <i data-lucide="chevron-down" class="faq-icon"></i>
+              </div>
+              <div class="faq-answer">
+                ViralCut AI evaluates segments across 6 core retention vectors: 
+                <strong>1. Opening Hook Strength</strong> (first 3-5 seconds curiosity or shock gap), 
+                <strong>2. Emotional Sentiment Variance</strong> (acoustic shifts, surprise, contrarian theses), 
+                <strong>3. Speech Pacing</strong> (140-180 words per minute sweet spot), 
+                <strong>4. Narrative Completeness</strong> (self-contained point), 
+                <strong>5. Information Density</strong>, and 
+                <strong>6. Shareability Ratio</strong>.
+                Scores range between 0 and 100. Clips are always ranked automatically with the highest score appearing FIRST.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+                <span>What are the 8 stages of video analysis?</span>
+                <i data-lucide="chevron-down" class="faq-icon"></i>
+              </div>
+              <div class="faq-answer">
+                When you click "Analyze Video", the engine runs through:
+                <ol style="margin-left: 1.5rem; margin-top: 0.5rem; line-height: 1.8;">
+                  <li><strong>Extracting video information:</strong> Inspects codec, resolution, and frame rates.</li>
+                  <li><strong>Extracting audio:</strong> Demuxes clean audio track and normalizes volume.</li>
+                  <li><strong>Transcribing speech:</strong> Deep acoustic speech-to-text with word timestamps.</li>
+                  <li><strong>Analyzing scenes & conversations:</strong> Identifies visual cuts and speaker clusters.</li>
+                  <li><strong>Identifying engaging moments:</strong> Detects punchlines, hooks, and takeaways.</li>
+                  <li><strong>Calculating viral potential:</strong> Multi-factor virality prediction.</li>
+                  <li><strong>Generating clips:</strong> 9:16 vertical smart crop and animated caption synthesis.</li>
+                  <li><strong>Ranking clips:</strong> Highest potential ranked at #1.</li>
+                </ol>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+                <span>How does backend integration work?</span>
+                <i data-lucide="chevron-down" class="faq-icon"></i>
+              </div>
+              <div class="faq-answer">
+                ViralCut AI frontend communicates via standard REST endpoints:
+                <code>POST /api/video/analyze</code>, <code>POST /api/video/upload</code>, <code>GET /api/video/status/:jobId</code>, and <code>GET /api/video/clips/:jobId</code>.
+                In standalone browser mode, it operates an authentic deterministic AI simulation. You can connect your custom Python Flask or Node.js server in the Settings tab.
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <div class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+                <span>What keyboard shortcuts are available?</span>
+                <i data-lucide="chevron-down" class="faq-icon"></i>
+              </div>
+              <div class="faq-answer">
+                <ul style="margin-left: 1.5rem; line-height: 1.8;">
+                  <li><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">Space</kbd> : Play / Pause video in Clip Editor</li>
+                  <li><kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">Esc</kbd> : Close open modal window or editor</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 1: AI Processing Pipeline Modal (8 Stages)
+       ====================================================================== -->
+  <div class="processing-overlay" id="processingOverlay">
+    <div class="processing-dialog">
+      <div class="processing-header">
+        <div class="ai-pulse-icon">
+          <i data-lucide="sparkles" style="width: 32px; height: 32px;"></i>
+        </div>
+        <h2>AI Video Analysis Engine</h2>
+        <p id="pipelineStageText">Stage 1/8: Extracting video information</p>
+      </div>
+
+      <!-- Master Progress Bar -->
+      <div class="master-progress-wrap">
+        <div class="progress-labels">
+          <span style="color: var(--text-muted);">Overall Pipeline Progress</span>
+          <span id="pipelinePercentText" style="color: var(--accent-cyan);">0%</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill-glow" id="pipelineProgressBar"></div>
+        </div>
+      </div>
+
+      <!-- 8 Stages List -->
+      <div class="pipeline-stages-list" id="pipelineStagesList">
+        <!-- Injected dynamically by video-analysis.js -->
+      </div>
+
+      <!-- AI Real-Time Terminal Log Stream -->
+      <div class="ai-terminal-log" id="pipelineTerminalLog"></div>
+
+      <div class="processing-footer">
+        <button class="btn btn-secondary btn-sm" id="cancelAnalysisBtn">
+          <i data-lucide="x"></i> Cancel Analysis
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 2: Interactive Clip Editing Studio
+       ====================================================================== -->
+  <div class="editor-modal" id="editorModal">
+    <div class="editor-dialog">
+      <div class="editor-header">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div class="logo-icon" style="width: 30px; height: 30px; border-radius: 6px;">
+            <i data-lucide="scissors" style="width: 16px; height: 16px;"></i>
+          </div>
+          <h3 style="font-size: 1.15rem;">Viral Clip Studio & Subtitle Editor</h3>
+        </div>
+        <button class="sidebar-toggle-btn" id="editorCloseBtn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="editor-body">
+        <!-- Left: Live Video Player with Aspect Mockup & Captions -->
+        <div class="editor-player-panel">
+          <div class="player-frame-wrapper" id="playerFrameWrapper">
+            <video class="editor-video-element" id="editorVideo" playsinline preload="auto" muted></video>
+            <!-- Animated Dynamic Captions Overlay -->
+            <div class="captions-overlay" id="captionsOverlay" data-style="hormozi">
+              <div class="caption-text-hormozi">
+                SAMPLE <span class="active-word">ANIMATED</span> CAPTION
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Controls -->
+          <div class="player-custom-controls">
+            <button class="btn btn-secondary btn-sm" id="editorPlayPauseBtn" style="padding: 0.4rem 0.6rem;">
+              <i data-lucide="play"></i>
+            </button>
+            <div class="player-timeline-bar" id="editorTimelineBar">
+              <div class="player-timeline-progress" id="editorTimelineProgress"></div>
+            </div>
+            <span style="font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-muted);" id="editorCurrentTime">
+              00:00 / 00:30
+            </span>
+          </div>
+        </div>
+
+        <!-- Right: Clip Customization & Subtitle Tuning -->
+        <div class="editor-controls-panel">
+          <!-- Title -->
+          <div class="editor-field-group">
+            <label for="editorClipTitle">Clip Headline / Title</label>
+            <input type="text" id="editorClipTitle" class="text-input" style="padding: 0.7rem 1rem;" />
+          </div>
+
+          <!-- Aspect Ratio Switcher -->
+          <div class="editor-field-group">
+            <label>Aspect Ratio Framing</label>
+            <div class="segmented-control">
+              <div class="segmented-option editor-ratio-opt active" data-ratio="9:16">9:16 Vertical</div>
+              <div class="segmented-option editor-ratio-opt" data-ratio="16:9">16:9 Landscape</div>
+              <div class="segmented-option editor-ratio-opt" data-ratio="1:1">1:1 Square</div>
+            </div>
+          </div>
+
+          <!-- Dynamic Caption Style Switcher -->
+          <div class="editor-field-group">
+            <label>Animated Caption Aesthetic</label>
+            <div class="segmented-control">
+              <div class="segmented-option editor-style-opt active" data-style="hormozi">Hormozi Pop</div>
+              <div class="segmented-option editor-style-opt" data-style="clean">Minimalist Pill</div>
+              <div class="segmented-option editor-style-opt" data-style="cyber">Cyber Neon</div>
+            </div>
+          </div>
+
+          <!-- Trimming Sliders -->
+          <div class="editor-field-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label>Clip Boundary Trimming</label>
+              <span id="editorDurationLabel" style="font-size: 0.8rem; color: var(--accent-cyan); font-weight: 700;">30s</span>
+            </div>
+            
+            <div style="font-size: 0.78rem; color: var(--text-dim); margin-bottom: 0.2rem;">
+              Start Time: <strong id="editorTrimStartLabel" style="color: var(--text-main);">00:00</strong>
+            </div>
+            <div class="trim-slider-wrap">
+              <input type="range" id="editorTrimStart" min="0" max="600" step="1" value="0" />
+            </div>
+
+            <div style="font-size: 0.78rem; color: var(--text-dim); margin-top: 0.5rem; margin-bottom: 0.2rem;">
+              End Time: <strong id="editorTrimEndLabel" style="color: var(--text-main);">00:30</strong>
+            </div>
+            <div class="trim-slider-wrap">
+              <input type="range" id="editorTrimEnd" min="0" max="600" step="1" value="30" />
+            </div>
+          </div>
+
+          <!-- Subtitles Transcription Segment Editor -->
+          <div class="editor-field-group">
+            <label>Timecoded Subtitle Transcript</label>
+            <div class="subtitles-editor-list" id="editorSubtitlesList">
+              <!-- Dynamically populated by clip-generator.js -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editor Footer Actions -->
+      <div class="editor-footer">
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-secondary btn-sm" id="downloadSrtBtn">
+            <i data-lucide="file-text"></i> Download .SRT
+          </button>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem;">
+          <button class="btn btn-secondary" id="saveClipEditsBtn">
+            <i data-lucide="save"></i> Save Changes
+          </button>
+          <button class="btn btn-primary" id="downloadSingleClipBtn">
+            <i data-lucide="download"></i> Download Clip Video
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Application Logic Modules (Strictly Vanilla ES6 JavaScript) -->
+  <script src="js/storage.js"></script>
+  <script src="js/video-upload.js"></script>
+  <script src="js/video-analysis.js"></script>
+  <script src="js/clip-generator.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/app.js"></script>
+
+  <!-- Initialize Lucide Icons -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>

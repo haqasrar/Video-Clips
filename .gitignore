@@ -1,0 +1,24 @@
+# Environment variables & secrets (CRITICAL: NEVER COMMIT)
+.env
+*.env
+backend/.env
+viralcut-ai/backend/.env
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# Uploads & temporary media files
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/clips/*
+!backend/clips/.gitkeep
+viralcut-ai/backend/uploads/*
+!viralcut-ai/backend/uploads/.gitkeep
+viralcut-ai/backend/clips/*
+!viralcut-ai/backend/clips/.gitkeep
+
+# System & dependencies
+node_modules/
+.DS_Store
+Thumbs.db
