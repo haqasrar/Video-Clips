@@ -30,6 +30,10 @@ class ClipGenerator {
     this.editorModal = document.getElementById('editorModal');
     this.editorCloseBtn = document.getElementById('editorCloseBtn');
     this.editorVideo = document.getElementById('editorVideo');
+    this.editorYoutubeFrame = document.getElementById('editorYoutubeFrame');
+    this.playerViewModeTabs = document.getElementById('playerViewModeTabs');
+    this.btnModeCaptions = document.getElementById('btnModeCaptions');
+    this.btnModeYouTube = document.getElementById('btnModeYouTube');
     this.playerFrame = document.getElementById('playerFrameWrapper');
     this.captionsOverlay = document.getElementById('captionsOverlay');
     this.editorTitleInput = document.getElementById('editorClipTitle');
@@ -370,12 +374,29 @@ class ClipGenerator {
     // Subtitles List
     this.renderSubtitlesEditor(clip.subtitles || []);
 
-    // Set Video Source
-    if (this.editorVideo) {
-      this.editorVideo.src = project.videoUrl || 'https://vjs.zencdn.net/v/oceans.mp4';
-      this.editorVideo.currentTime = clip.startTime || 0;
-      this.editorVideo.play().catch(e => console.log('Autoplay prevented:', e));
+    // Set Video Source (sanitize and ensure valid playable stream)
+    let videoUrl = project.videoUrl;
+    if (!videoUrl || videoUrl.includes('commondatastorage.googleapis.com') || videoUrl.includes('BigBuckBunny') || videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+      videoUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
+      project.videoUrl = videoUrl;
     }
+
+    if (this.editorVideo) {
+      this.editorVideo.src = videoUrl;
+      this.editorVideo.load();
+      this.editorVideo.currentTime = clip.startTime || 0;
+      this.editorVideo.play().catch(e => console.log('Autoplay notice:', e));
+    }
+
+    // Check if YouTube source exists for optional native YouTube embed preview
+    const ytId = this.extractYoutubeId(project.sourceUrl || project.videoUrl);
+    if (this.playerViewModeTabs) {
+      this.playerViewModeTabs.style.display = ytId ? 'flex' : 'none';
+    }
+    if (ytId && this.editorYoutubeFrame) {
+      this.editorYoutubeFrame.src = `https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(clip.startTime || 0)}&end=${Math.floor(clip.endTime || 30)}&autoplay=1&enablejsapi=1`;
+    }
+    this.switchPlayerMode('captions');
 
     // Open Modal
     if (this.editorModal) {
@@ -384,9 +405,49 @@ class ClipGenerator {
     if (window.lucide) window.lucide.createIcons();
   }
 
+  extractYoutubeId(url) {
+    if (!url) return null;
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
+    return match ? match[1] : null;
+  }
+
+  switchPlayerMode(mode) {
+    if (mode === 'youtube') {
+      if (this.editorVideo) {
+        this.editorVideo.pause();
+        this.editorVideo.style.display = 'none';
+      }
+      if (this.captionsOverlay) this.captionsOverlay.style.display = 'none';
+      if (this.editorYoutubeFrame) this.editorYoutubeFrame.style.display = 'block';
+      if (this.btnModeCaptions) {
+        this.btnModeCaptions.className = 'btn btn-secondary btn-sm';
+      }
+      if (this.btnModeYouTube) {
+        this.btnModeYouTube.className = 'btn btn-primary btn-sm active';
+      }
+    } else {
+      if (this.editorYoutubeFrame) this.editorYoutubeFrame.style.display = 'none';
+      if (this.editorVideo) {
+        this.editorVideo.style.display = 'block';
+        this.editorVideo.play().catch(() => {});
+      }
+      if (this.captionsOverlay) this.captionsOverlay.style.display = 'block';
+      if (this.btnModeCaptions) {
+        this.btnModeCaptions.className = 'btn btn-primary btn-sm active';
+      }
+      if (this.btnModeYouTube) {
+        this.btnModeYouTube.className = 'btn btn-secondary btn-sm';
+      }
+    }
+    if (window.lucide) window.lucide.createIcons();
+  }
+
   closeEditor() {
     if (this.editorVideo) {
       this.editorVideo.pause();
+    }
+    if (this.editorYoutubeFrame) {
+      this.editorYoutubeFrame.src = '';
     }
     if (this.editorModal) {
       this.editorModal.classList.remove('active');
@@ -568,7 +629,10 @@ class ClipGenerator {
   async downloadClipVideo(clip) {
     window.app.showToast(`Preparing download for: "${clip.title.slice(0, 24)}..."`, 'info');
 
-    const videoUrl = this.currentProject.videoUrl || 'https://vjs.zencdn.net/v/oceans.mp4';
+    let videoUrl = this.currentProject.videoUrl;
+    if (!videoUrl || videoUrl.includes('commondatastorage.googleapis.com') || videoUrl.includes('BigBuckBunny') || videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+      videoUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
+    }
     const fileName = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.mp4`;
 
     try {

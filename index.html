@@ -833,8 +833,19 @@
       <div class="editor-body">
         <!-- Left: Live Video Player with Aspect Mockup & Captions -->
         <div class="editor-player-panel">
+          <!-- Player Mode Switcher (Shorts vs YouTube) -->
+          <div class="player-view-mode-tabs" id="playerViewModeTabs" style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem; width: 100%; max-width: 300px;">
+            <button type="button" class="btn btn-primary btn-sm active" id="btnModeCaptions" style="flex: 1; font-size: 0.75rem; padding: 0.35rem 0.5rem;" onclick="clipGenerator.switchPlayerMode('captions')">
+              <i data-lucide="smartphone" style="width: 14px; height: 14px;"></i> 9:16 Shorts
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btnModeYouTube" style="flex: 1; font-size: 0.75rem; padding: 0.35rem 0.5rem;" onclick="clipGenerator.switchPlayerMode('youtube')">
+              <i data-lucide="youtube" style="width: 14px; height: 14px;"></i> YouTube Stream
+            </button>
+          </div>
+
           <div class="player-frame-wrapper" id="playerFrameWrapper">
             <video class="editor-video-element" id="editorVideo" playsinline preload="auto" muted></video>
+            <iframe class="editor-video-element" id="editorYoutubeFrame" style="display: none; border: none; width: 100%; height: 100%;" allow="autoplay; encrypted-media" allowfullscreen></iframe>
             <!-- Animated Dynamic Captions Overlay -->
             <div class="captions-overlay" id="captionsOverlay" data-style="hormozi">
               <div class="caption-text-hormozi">

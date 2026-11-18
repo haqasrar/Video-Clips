@@ -429,7 +429,20 @@ class StorageManager {
   getProjects() {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.PROJECTS);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const projects = JSON.parse(data);
+      // Auto-sanitize legacy broken Google Cloud Storage URLs
+      let changed = false;
+      projects.forEach(p => {
+        if (p.videoUrl && (p.videoUrl.includes('commondatastorage.googleapis.com') || p.videoUrl.includes('BigBuckBunny'))) {
+          p.videoUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
+          changed = true;
+        }
+      });
+      if (changed) {
+        localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+      }
+      return projects;
     } catch (e) {
       console.error('Error reading projects from storage:', e);
       return [];
