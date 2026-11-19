@@ -279,18 +279,18 @@ Each clip object MUST have:
 - hashtags: array of 5-6 trending hashtags relevant to the topic
 - subtitles: array of 3-4 objects { start: 0, end: 6, text: "SUBTITLE TEXT IN ALL CAPS" } with realistic spoken dialogue about this video topic`;
 
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      let res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${groqKey}`
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           messages: [
             {
               role: 'system',
-              content: 'You are ViralCut AI, an elite viral video intelligence engine. Always output strictly valid JSON with an array of ranked clips.'
+              content: 'You are ViralCut AI, an elite viral video intelligence engine like Opus Clip and Klap. Always output strictly valid JSON with an array of ranked clips.'
             },
             {
               role: 'user',
@@ -301,6 +301,28 @@ Each clip object MUST have:
           temperature: 0.6
         })
       });
+
+      if (!res.ok) {
+        // Fast fallback to 20b model
+        res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${groqKey}`
+          },
+          body: JSON.stringify({
+            model: 'openai/gpt-oss-20b',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are ViralCut AI. Output strictly valid JSON with array of ranked clips.'
+              },
+              { role: 'user', content: prompt }
+            ],
+            response_format: { type: 'json_object' }
+          })
+        });
+      }
 
       if (res.ok) {
         const data = await res.json();

@@ -424,7 +424,7 @@ class AppController {
       const isOnline = await window.videoAnalysisEngine.testBackendConnection();
       this.updateBackendStatusUI(isOnline, isOnline ? 'Backend Server Connected' : 'Live AI Engine (Active)');
     } else {
-      this.updateBackendStatusUI(true, 'Live AI Active (Groq 70B)');
+      this.updateBackendStatusUI(true, 'Live AI Active (Groq 120B)');
     }
   }
 

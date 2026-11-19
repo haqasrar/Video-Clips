@@ -31,9 +31,10 @@ class ClipGenerator {
     this.editorCloseBtn = document.getElementById('editorCloseBtn');
     this.editorVideo = document.getElementById('editorVideo');
     this.editorYoutubeFrame = document.getElementById('editorYoutubeFrame');
-    this.playerViewModeTabs = document.getElementById('playerViewModeTabs');
-    this.btnModeCaptions = document.getElementById('btnModeCaptions');
-    this.btnModeYouTube = document.getElementById('btnModeYouTube');
+    this.editorPosterBackdrop = document.getElementById('editorPosterBackdrop');
+    this.editorReplayBtn = document.getElementById('editorReplayBtn');
+    this.editorMuteToggleBtn = document.getElementById('editorMuteToggleBtn');
+    this.editorYtDirectLink = document.getElementById('editorYtDirectLink');
     this.playerFrame = document.getElementById('playerFrameWrapper');
     this.captionsOverlay = document.getElementById('captionsOverlay');
     this.editorTitleInput = document.getElementById('editorClipTitle');
@@ -71,6 +72,14 @@ class ClipGenerator {
       this.editorModal.addEventListener('click', (e) => {
         if (e.target === this.editorModal) this.closeEditor();
       });
+    }
+
+    // Replay & Mute Buttons
+    if (this.editorReplayBtn) {
+      this.editorReplayBtn.addEventListener('click', () => this.replayCurrentClip());
+    }
+    if (this.editorMuteToggleBtn) {
+      this.editorMuteToggleBtn.addEventListener('click', () => this.toggleMute());
     }
 
     // Save clip modifications
@@ -374,37 +383,41 @@ class ClipGenerator {
     // Subtitles List
     this.renderSubtitlesEditor(clip.subtitles || []);
 
-    // Check if YouTube source exists
+    // Set poster backdrop image (guarantees real visuals even during buffering)
     const ytId = this.extractYoutubeId(project.sourceUrl || project.videoUrl);
+    const posterSrc = project.thumbnail || (ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : '');
+    if (this.editorPosterBackdrop && posterSrc) {
+      this.editorPosterBackdrop.src = posterSrc;
+      this.editorPosterBackdrop.style.display = 'block';
+    }
 
     if (ytId) {
-      // YOUTUBE VIDEO PREVIEW: Show YouTube iframe directly
-      if (this.playerViewModeTabs) this.playerViewModeTabs.style.display = 'flex';
+      // YOUTUBE VIDEO: embed YouTube player directly with captions on top
       if (this.editorVideo) {
         this.editorVideo.pause();
         this.editorVideo.style.display = 'none';
       }
       if (this.editorYoutubeFrame) {
         this.editorYoutubeFrame.style.display = 'block';
-        this.editorYoutubeFrame.src = `https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(clip.startTime || 0)}&end=${Math.floor(clip.endTime || 30)}&autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`;
+        this.editorYoutubeFrame.src = `https://www.youtube.com/embed/${ytId}?start=${Math.floor(clip.startTime || 0)}&end=${Math.floor(clip.endTime || 30)}&autoplay=1&mute=1&controls=1&enablejsapi=1&playsinline=1&rel=0`;
+      }
+      if (this.editorYtDirectLink) {
+        this.editorYtDirectLink.href = `https://youtu.be/${ytId}?t=${Math.floor(clip.startTime || 0)}`;
+        this.editorYtDirectLink.style.display = 'inline-flex';
       }
       if (this.captionsOverlay) this.captionsOverlay.style.display = 'block';
       this.startCaptionTimer(clip);
     } else {
       // UPLOADED OR DIRECT VIDEO
-      if (this.playerViewModeTabs) this.playerViewModeTabs.style.display = 'none';
       if (this.editorYoutubeFrame) {
         this.editorYoutubeFrame.src = '';
         this.editorYoutubeFrame.style.display = 'none';
       }
-      this.stopCaptionTimer();
-
-      let videoUrl = project.videoUrl || 'https://vjs.zencdn.net/v/oceans.mp4';
-      if (videoUrl.includes('commondatastorage.googleapis.com') || videoUrl.includes('BigBuckBunny')) {
-        videoUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
-        project.videoUrl = videoUrl;
+      if (this.editorYtDirectLink) {
+        this.editorYtDirectLink.style.display = 'none';
       }
 
+      let videoUrl = project.videoUrl || 'https://vjs.zencdn.net/v/oceans.mp4';
       if (this.editorVideo) {
         this.editorVideo.style.display = 'block';
         this.editorVideo.src = videoUrl;
@@ -413,6 +426,7 @@ class ClipGenerator {
         this.editorVideo.play().catch(e => console.log('Autoplay notice:', e));
       }
       if (this.captionsOverlay) this.captionsOverlay.style.display = 'block';
+      this.startCaptionTimer(clip);
     }
 
     // Open Modal
@@ -420,6 +434,38 @@ class ClipGenerator {
       this.editorModal.classList.add('active');
     }
     if (window.lucide) window.lucide.createIcons();
+  }
+
+  replayCurrentClip() {
+    if (!this.activeClip) return;
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    if (ytId && this.editorYoutubeFrame && this.editorYoutubeFrame.style.display !== 'none') {
+      this.editorYoutubeFrame.src = `https://www.youtube.com/embed/${ytId}?start=${Math.floor(this.activeClip.startTime || 0)}&end=${Math.floor(this.activeClip.endTime || 30)}&autoplay=1&mute=0&controls=1&enablejsapi=1&playsinline=1&rel=0`;
+    }
+    if (this.editorVideo && this.editorVideo.style.display !== 'none') {
+      this.editorVideo.currentTime = this.activeClip.startTime || 0;
+      this.editorVideo.play().catch(() => {});
+    }
+    this.startCaptionTimer(this.activeClip);
+    window.app.showToast('Replaying clip from start', 'info', 1500);
+  }
+
+  toggleMute() {
+    if (this.editorVideo && this.editorVideo.style.display !== 'none') {
+      this.editorVideo.muted = !this.editorVideo.muted;
+      if (this.editorMuteToggleBtn) {
+        this.editorMuteToggleBtn.innerHTML = this.editorVideo.muted
+          ? `<i data-lucide="volume-x" style="width: 14px; height: 14px;"></i> <span>Muted</span>`
+          : `<i data-lucide="volume-2" style="width: 14px; height: 14px;"></i> <span>Sound On</span>`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    if (ytId && this.editorYoutubeFrame) {
+      // Reload YouTube with sound unmuted
+      this.editorYoutubeFrame.src = `https://www.youtube.com/embed/${ytId}?start=${Math.floor(this.activeClip?.startTime || 0)}&end=${Math.floor(this.activeClip?.endTime || 30)}&autoplay=1&mute=0&controls=1&enablejsapi=1&playsinline=1&rel=0`;
+      window.app.showToast('Unmuted YouTube audio', 'info', 1500);
+    }
   }
 
   startCaptionTimer(clip) {
@@ -569,6 +615,14 @@ class ClipGenerator {
       }).join(' ');
 
       this.captionsOverlay.innerHTML = `<div class="caption-text-hormozi">${htmlWords}</div>`;
+    } else if (style === 'submagic') {
+      const words = displayText.split(' ');
+      const activeWordIndex = Math.floor((clipElapsedSecs % 3) * (words.length / 3));
+      const htmlWords = words.map((w, i) => {
+        return i === activeWordIndex ? `<span class="active-word">${w}</span>` : w;
+      }).join(' ');
+
+      this.captionsOverlay.innerHTML = `<div class="caption-text-submagic">${htmlWords}</div>`;
     } else if (style === 'clean') {
       this.captionsOverlay.innerHTML = `<div class="caption-text-clean">${displayText}</div>`;
     } else if (style === 'cyber') {
@@ -631,15 +685,33 @@ class ClipGenerator {
     if (!this.editorSubtitlesList) return;
     this.editorSubtitlesList.innerHTML = subtitles.map((sub, index) => `
       <div class="sub-item-row" data-sub-index="${index}">
-        <span class="sub-timestamp">${sub.start}s - ${sub.end}s</span>
-        <input type="text" class="sub-input-text" value="${sub.text}" onchange="clipGenerator.updateSubtitleText(${index}, this.value)" />
+        <button type="button" class="sub-timestamp" onclick="clipGenerator.seekToSubtitle(${sub.start})" title="Jump video to ${sub.start}s">
+          <i data-lucide="play" style="width: 10px; height: 10px; display: inline;"></i> ${sub.start}s
+        </button>
+        <input type="text" class="sub-input-text" value="${sub.text}" oninput="clipGenerator.updateSubtitleText(${index}, this.value)" />
       </div>
     `).join('');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  seekToSubtitle(startSec) {
+    if (!this.activeClip) return;
+    const targetTime = (this.activeClip.startTime || 0) + startSec;
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    if (ytId && this.editorYoutubeFrame) {
+      this.editorYoutubeFrame.src = `https://www.youtube.com/embed/${ytId}?start=${Math.floor(targetTime)}&end=${Math.floor(this.activeClip.endTime || 30)}&autoplay=1&mute=0&controls=1&enablejsapi=1&playsinline=1&rel=0`;
+    }
+    if (this.editorVideo && this.editorVideo.style.display !== 'none') {
+      this.editorVideo.currentTime = targetTime;
+      this.editorVideo.play().catch(() => {});
+    }
+    this.renderCurrentCaption(startSec);
   }
 
   updateSubtitleText(index, newText) {
     if (this.activeClip && this.activeClip.subtitles && this.activeClip.subtitles[index]) {
       this.activeClip.subtitles[index].text = newText;
+      this.renderCurrentCaption(this.activeClip.subtitles[index].start);
     }
   }
 
