@@ -825,9 +825,15 @@
           </div>
           <h3 style="font-size: 1.15rem;">Viral Clip Studio & Subtitle Editor</h3>
         </div>
-        <button class="sidebar-toggle-btn" id="editorCloseBtn">
-          <i data-lucide="x"></i>
-        </button>
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <button class="btn btn-primary btn-sm" id="editorHeaderDownloadBtn">
+            <i data-lucide="download"></i>
+            <span>Download Video</span>
+          </button>
+          <button class="sidebar-toggle-btn" id="editorCloseBtn">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
       </div>
 
       <div class="editor-body">
@@ -838,6 +844,12 @@
             <img id="editorPosterBackdrop" class="editor-poster-backdrop" src="" alt="Video Frame" style="display: none;" />
             <video class="editor-video-element" id="editorVideo" playsinline preload="auto" muted></video>
             <iframe class="editor-video-element" id="editorYoutubeFrame" style="display: none; border: none; width: 100%; height: 100%;" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+            <!-- Center Big Play Button Overlay -->
+            <div class="player-center-play-overlay" id="playerCenterPlayBtn" title="Click to Play Video with Sound">
+              <div class="play-pulse-circle">
+                <i data-lucide="play" style="width: 28px; height: 28px; fill: #ffffff; margin-left: 3px;"></i>
+              </div>
+            </div>
             <!-- Animated Dynamic Captions Overlay (Klap / Submagic / Opus Clip Style) -->
             <div class="captions-overlay" id="captionsOverlay" data-style="hormozi">
               <div class="caption-text-hormozi">
@@ -870,6 +882,13 @@
             <a href="#" target="_blank" class="btn btn-ghost btn-sm" id="editorYtDirectLink" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; display: none;">
               <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> <span>Watch on YouTube</span>
             </a>
+          </div>
+
+          <!-- Direct Download Clip Button right below player -->
+          <div class="player-direct-action-bar" style="display: flex; gap: 0.5rem; margin-top: 0.75rem; width: 100%; max-width: 320px;">
+            <button class="btn btn-primary btn-sm" id="playerDirectDownloadBtn" style="flex: 1; justify-content: center;">
+              <i data-lucide="download"></i> <span>Download Clip Video</span>
+            </button>
           </div>
         </div>
 
@@ -936,18 +955,21 @@
 
       <!-- Editor Footer Actions (Klap / Opus Clip Style) -->
       <div class="editor-footer">
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
           <button class="btn btn-secondary btn-sm" id="downloadSrtBtn" title="Download timecoded .SRT subtitle file for Premiere, CapCut, DaVinci">
             <i data-lucide="file-text"></i> Download .SRT
           </button>
+          <button class="btn btn-ghost btn-sm" id="editorCopyInfoBtn" title="Copy title, tags and timestamps">
+            <i data-lucide="copy"></i> Copy Info
+          </button>
         </div>
 
-        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
           <button class="btn btn-secondary" id="saveClipEditsBtn">
             <i data-lucide="save"></i> Save Changes
           </button>
           <button class="btn btn-primary" id="downloadSingleClipBtn">
-            <i data-lucide="download"></i> Download Clip Video (.mp4)
+            <i data-lucide="download"></i> Download Clip Video
           </button>
         </div>
       </div>

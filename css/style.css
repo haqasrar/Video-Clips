@@ -2138,6 +2138,7 @@ input:checked + .toggle-slider:before {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 25px 70px rgba(0, 0, 0, 0.85);
+  min-width: 300px;
 }
 
 .editor-header {
@@ -2146,6 +2147,8 @@ input:checked + .toggle-slider:before {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .editor-body {
@@ -2154,9 +2157,10 @@ input:checked + .toggle-slider:before {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .editor-body {
     grid-template-columns: 1fr;
   }
@@ -2164,6 +2168,9 @@ input:checked + .toggle-slider:before {
     border-right: none !important;
     border-bottom: 1px solid var(--border-subtle);
     padding: 1rem !important;
+  }
+  .player-frame-wrapper {
+    max-width: 250px !important;
   }
 }
 
@@ -2225,18 +2232,50 @@ input:checked + .toggle-slider:before {
   border: none;
 }
 
+/* Center Big Play Button Overlay */
+.player-center-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 8;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.2);
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+
+.player-center-play-overlay.playing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.player-center-play-overlay:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.play-pulse-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 25px rgba(139, 92, 246, 0.6);
+  transition: transform var(--transition-fast);
+}
+
+.player-center-play-overlay:hover .play-pulse-circle {
+  transform: scale(1.1);
+}
+
 /* Dynamic Captions Overlay on Video */
 .captions-overlay {
   position: absolute;
   bottom: 16%;
   left: 6%;
   right: 6%;
-  text-align: center;
-  pointer-events: none;
-  z-index: 10;
-  transition: all var(--transition-fast);
-}
-  right: 10%;
   text-align: center;
   pointer-events: none;
   z-index: 10;

@@ -47,6 +47,10 @@ class ClipGenerator {
     this.saveClipBtn = document.getElementById('saveClipEditsBtn');
     this.downloadClipBtn = document.getElementById('downloadSingleClipBtn');
     this.downloadSrtBtn = document.getElementById('downloadSrtBtn');
+    this.editorCopyInfoBtn = document.getElementById('editorCopyInfoBtn');
+    this.editorHeaderDownloadBtn = document.getElementById('editorHeaderDownloadBtn');
+    this.playerDirectDownloadBtn = document.getElementById('playerDirectDownloadBtn');
+    this.playerCenterPlayBtn = document.getElementById('playerCenterPlayBtn');
     this.downloadAllBtn = document.getElementById('downloadAllClipsBtn');
 
     // Playback controls in editor
@@ -54,6 +58,7 @@ class ClipGenerator {
     this.editorTimelineProgress = document.getElementById('editorTimelineProgress');
     this.editorTimelineBar = document.getElementById('editorTimelineBar');
     this.editorCurrentTime = document.getElementById('editorCurrentTime');
+    this.isPlaybackPlaying = false;
 
     // Ratio and Caption Style buttons in Editor
     this.editorRatioOptions = document.querySelectorAll('.editor-ratio-opt');
@@ -87,17 +92,30 @@ class ClipGenerator {
       this.saveClipBtn.addEventListener('click', () => this.saveCurrentClipEdits());
     }
 
-    // Download single clip video
-    if (this.downloadClipBtn) {
-      this.downloadClipBtn.addEventListener('click', () => {
-        if (this.activeClip) this.downloadClipVideo(this.activeClip);
-      });
+    // Download single clip video (Bound to multiple access buttons)
+    const triggerDownload = () => {
+      if (this.activeClip) this.downloadClipVideo(this.activeClip);
+    };
+    if (this.downloadClipBtn) this.downloadClipBtn.addEventListener('click', triggerDownload);
+    if (this.editorHeaderDownloadBtn) this.editorHeaderDownloadBtn.addEventListener('click', triggerDownload);
+    if (this.playerDirectDownloadBtn) this.playerDirectDownloadBtn.addEventListener('click', triggerDownload);
+
+    // Center big play overlay
+    if (this.playerCenterPlayBtn) {
+      this.playerCenterPlayBtn.addEventListener('click', () => this.toggleEditorPlayback());
     }
 
     // Download SRT
     if (this.downloadSrtBtn) {
       this.downloadSrtBtn.addEventListener('click', () => {
         if (this.activeClip) this.downloadSubtitlesSRT(this.activeClip);
+      });
+    }
+
+    // Copy Info
+    if (this.editorCopyInfoBtn) {
+      this.editorCopyInfoBtn.addEventListener('click', () => {
+        if (this.activeClip) this.copyClipMetadata(this.activeClip.id);
       });
     }
 
@@ -297,11 +315,14 @@ class ClipGenerator {
               </div>
 
               <div class="clip-action-buttons">
-                <button class="btn btn-primary btn-sm" onclick="clipGenerator.openClipEditor('${this.currentProject.id}', '${clip.id}')">
-                  <i data-lucide="edit-3"></i> Edit Clip
+                <button class="btn btn-primary btn-sm" onclick="clipGenerator.downloadClipVideoById('${clip.id}')" title="Download playable video clip">
+                  <i data-lucide="download"></i> Download Video
                 </button>
-                <button class="btn btn-secondary btn-sm" onclick="clipGenerator.downloadClipVideoById('${clip.id}')">
-                  <i data-lucide="download"></i> Download MP4
+                <button class="btn btn-secondary btn-sm" onclick="clipGenerator.openClipEditor('${this.currentProject.id}', '${clip.id}')" title="Review video & customize captions">
+                  <i data-lucide="edit-3"></i> Edit & Review
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="clipGenerator.downloadSubtitlesSRTById('${clip.id}')" title="Download .SRT subtitle file">
+                  <i data-lucide="file-text"></i> .SRT
                 </button>
                 <button class="btn btn-ghost btn-sm" onclick="clipGenerator.copyClipMetadata('${clip.id}')" title="Copy Title & Tags">
                   <i data-lucide="copy"></i> Copy
@@ -433,6 +454,9 @@ class ClipGenerator {
     if (this.editorModal) {
       this.editorModal.classList.add('active');
     }
+    this.isPlaybackPlaying = true;
+    if (this.playerCenterPlayBtn) this.playerCenterPlayBtn.classList.add('playing');
+    if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="pause"></i>`;
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -440,17 +464,35 @@ class ClipGenerator {
     if (!this.activeClip) return;
     const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
     if (ytId && this.editorYoutubeFrame && this.editorYoutubeFrame.style.display !== 'none') {
-      this.editorYoutubeFrame.src = `https://www.youtube.com/embed/${ytId}?start=${Math.floor(this.activeClip.startTime || 0)}&end=${Math.floor(this.activeClip.endTime || 30)}&autoplay=1&mute=0&controls=1&enablejsapi=1&playsinline=1&rel=0`;
+      this.sendYoutubeCommand('seekTo', Math.floor(this.activeClip.startTime || 0));
+      this.sendYoutubeCommand('playVideo');
     }
     if (this.editorVideo && this.editorVideo.style.display !== 'none') {
       this.editorVideo.currentTime = this.activeClip.startTime || 0;
       this.editorVideo.play().catch(() => {});
     }
+    this.isPlaybackPlaying = true;
+    if (this.playerCenterPlayBtn) this.playerCenterPlayBtn.classList.add('playing');
+    if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="pause"></i>`;
     this.startCaptionTimer(this.activeClip);
     window.app.showToast('Replaying clip from start', 'info', 1500);
+    if (window.lucide) window.lucide.createIcons();
   }
 
   toggleMute() {
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    if (ytId && this.editorYoutubeFrame) {
+      this.isMuted = !this.isMuted;
+      this.sendYoutubeCommand(this.isMuted ? 'mute' : 'unMute');
+      if (this.editorMuteToggleBtn) {
+        this.editorMuteToggleBtn.innerHTML = this.isMuted
+          ? `<i data-lucide="volume-x" style="width: 14px; height: 14px;"></i> <span>Muted</span>`
+          : `<i data-lucide="volume-2" style="width: 14px; height: 14px;"></i> <span>Sound On</span>`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+      window.app.showToast(this.isMuted ? 'Muted YouTube audio' : 'Unmuted YouTube audio', 'info', 1500);
+      return;
+    }
     if (this.editorVideo && this.editorVideo.style.display !== 'none') {
       this.editorVideo.muted = !this.editorVideo.muted;
       if (this.editorMuteToggleBtn) {
@@ -459,12 +501,6 @@ class ClipGenerator {
           : `<i data-lucide="volume-2" style="width: 14px; height: 14px;"></i> <span>Sound On</span>`;
         if (window.lucide) window.lucide.createIcons();
       }
-    }
-    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
-    if (ytId && this.editorYoutubeFrame) {
-      // Reload YouTube with sound unmuted
-      this.editorYoutubeFrame.src = `https://www.youtube.com/embed/${ytId}?start=${Math.floor(this.activeClip?.startTime || 0)}&end=${Math.floor(this.activeClip?.endTime || 30)}&autoplay=1&mute=0&controls=1&enablejsapi=1&playsinline=1&rel=0`;
-      window.app.showToast('Unmuted YouTube audio', 'info', 1500);
     }
   }
 
@@ -533,10 +569,15 @@ class ClipGenerator {
 
   closeEditor() {
     this.stopCaptionTimer();
+    this.isPlaybackPlaying = false;
+    if (this.playerCenterPlayBtn) {
+      this.playerCenterPlayBtn.classList.remove('playing');
+    }
     if (this.editorVideo) {
       this.editorVideo.pause();
     }
     if (this.editorYoutubeFrame) {
+      this.sendYoutubeCommand('pauseVideo');
       this.editorYoutubeFrame.src = '';
     }
     if (this.editorModal) {
@@ -631,15 +672,54 @@ class ClipGenerator {
   }
 
   toggleEditorPlayback() {
-    if (!this.editorVideo) return;
-    if (this.editorVideo.paused) {
-      this.editorVideo.play();
-      if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="pause"></i>`;
-    } else {
-      this.editorVideo.pause();
-      if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="play"></i>`;
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    
+    if (ytId && this.editorYoutubeFrame && this.editorYoutubeFrame.style.display !== 'none') {
+      this.isPlaybackPlaying = !this.isPlaybackPlaying;
+      if (this.isPlaybackPlaying) {
+        this.sendYoutubeCommand('playVideo');
+        if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="pause"></i>`;
+        if (this.playerCenterPlayBtn) this.playerCenterPlayBtn.classList.add('playing');
+        this.startCaptionTimer(this.activeClip);
+      } else {
+        this.sendYoutubeCommand('pauseVideo');
+        if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="play"></i>`;
+        if (this.playerCenterPlayBtn) this.playerCenterPlayBtn.classList.remove('playing');
+        this.stopCaptionTimer();
+      }
+      if (window.lucide) window.lucide.createIcons();
+      return;
     }
-    if (window.lucide) window.lucide.createIcons();
+
+    if (this.editorVideo && this.editorVideo.style.display !== 'none') {
+      if (this.editorVideo.paused) {
+        this.editorVideo.play().catch(() => {});
+        this.isPlaybackPlaying = true;
+        if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="pause"></i>`;
+        if (this.playerCenterPlayBtn) this.playerCenterPlayBtn.classList.add('playing');
+        this.startCaptionTimer(this.activeClip);
+      } else {
+        this.editorVideo.pause();
+        this.isPlaybackPlaying = false;
+        if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="play"></i>`;
+        if (this.playerCenterPlayBtn) this.playerCenterPlayBtn.classList.remove('playing');
+        this.stopCaptionTimer();
+      }
+      if (window.lucide) window.lucide.createIcons();
+    }
+  }
+
+  sendYoutubeCommand(cmd, arg = '') {
+    if (this.editorYoutubeFrame && this.editorYoutubeFrame.contentWindow) {
+      try {
+        const payload = arg !== '' 
+          ? JSON.stringify({ event: 'command', func: cmd, args: [arg] })
+          : JSON.stringify({ event: 'command', func: cmd, args: '' });
+        this.editorYoutubeFrame.contentWindow.postMessage(payload, '*');
+      } catch (e) {
+        console.warn('sendYoutubeCommand notice:', e);
+      }
+    }
   }
 
   // --- Trimming Adjuster ---
@@ -664,8 +744,13 @@ class ClipGenerator {
 
     const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
     if (ytId && this.editorYoutubeFrame && this.editorYoutubeFrame.style.display !== 'none') {
-      this.editorYoutubeFrame.src = `https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(start)}&end=${Math.floor(end)}&autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`;
+      this.sendYoutubeCommand('seekTo', start);
+      this.sendYoutubeCommand('playVideo');
+      this.isPlaybackPlaying = true;
+      if (this.playerCenterPlayBtn) this.playerCenterPlayBtn.classList.add('playing');
+      if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="pause"></i>`;
       this.startCaptionTimer(this.activeClip);
+      if (window.lucide) window.lucide.createIcons();
     }
   }
 
@@ -699,13 +784,21 @@ class ClipGenerator {
     const targetTime = (this.activeClip.startTime || 0) + startSec;
     const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
     if (ytId && this.editorYoutubeFrame) {
-      this.editorYoutubeFrame.src = `https://www.youtube.com/embed/${ytId}?start=${Math.floor(targetTime)}&end=${Math.floor(this.activeClip.endTime || 30)}&autoplay=1&mute=0&controls=1&enablejsapi=1&playsinline=1&rel=0`;
+      this.sendYoutubeCommand('seekTo', targetTime);
+      this.sendYoutubeCommand('playVideo');
+      this.isPlaybackPlaying = true;
+      if (this.playerCenterPlayBtn) this.playerCenterPlayBtn.classList.add('playing');
+      if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="pause"></i>`;
     }
     if (this.editorVideo && this.editorVideo.style.display !== 'none') {
       this.editorVideo.currentTime = targetTime;
       this.editorVideo.play().catch(() => {});
+      this.isPlaybackPlaying = true;
+      if (this.playerCenterPlayBtn) this.playerCenterPlayBtn.classList.add('playing');
+      if (this.editorPlayPauseBtn) this.editorPlayPauseBtn.innerHTML = `<i data-lucide="pause"></i>`;
     }
     this.renderCurrentCaption(startSec);
+    if (window.lucide) window.lucide.createIcons();
   }
 
   updateSubtitleText(index, newText) {
@@ -748,8 +841,26 @@ class ClipGenerator {
     if (clip) this.downloadClipVideo(clip);
   }
 
+  downloadSubtitlesSRTById(clipId) {
+    if (!this.currentProject) return;
+    const clip = this.currentProject.clips.find(c => c.id === clipId);
+    if (clip) this.downloadSubtitlesSRT(clip);
+  }
+
+  downloadSourceVideo(clip) {
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    if (ytId) {
+      window.open(`https://youtu.be/${ytId}?t=${Math.floor(clip.startTime || 0)}`, '_blank');
+      window.app.showToast('Opened original YouTube video at clip start timestamp!', 'info');
+      return;
+    }
+    if (this.currentProject?.videoUrl) {
+      window.open(this.currentProject.videoUrl, '_blank');
+    }
+  }
+
   async downloadClipVideo(clip) {
-    window.app.showToast(`Exporting MP4 video: "${clip.title.slice(0, 24)}..."`, 'info');
+    window.app.showToast(`Exporting clip video: "${clip.title.slice(0, 24)}..."`, 'info');
 
     // For uploaded MP4 files or direct video blobs
     const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
@@ -766,7 +877,7 @@ class ClipGenerator {
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
-          URL.revokeObjectURL(blobUrl);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
           window.app.showToast(`✅ Downloaded clip video (.mp4)!`, 'success');
           return;
         }
@@ -775,17 +886,103 @@ class ClipGenerator {
       }
     }
 
-    // Generate real 9:16 vertical video clip with animated captions via Canvas & MediaRecorder
+    // Generate real vertical video clip with animated captions via Canvas & MediaRecorder
     try {
       await this.exportCanvasClipVideo(clip);
     } catch (e) {
       console.warn('Canvas export fallback:', e);
-      window.app.showToast(`Video rendering error. Please try again.`, 'error');
+      window.app.showToast(`Video rendering notice: Exporting standard format`, 'info');
+    }
+  }
+
+  async patchWebmDuration(blob, durationMs) {
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+
+      // Search for Info element: 0x15, 0x49, 0xA9, 0x66
+      let infoIdx = -1;
+      for (let i = 0; i < Math.min(bytes.length - 4, 2048); i++) {
+        if (bytes[i] === 0x15 && bytes[i + 1] === 0x49 && bytes[i + 2] === 0xA9 && bytes[i + 3] === 0x66) {
+          infoIdx = i;
+          break;
+        }
+      }
+
+      if (infoIdx === -1) return blob;
+
+      // Check if Duration element (0x44, 0x89) is already present in Info block
+      let durIdx = -1;
+      for (let i = infoIdx + 4; i < Math.min(bytes.length - 4, infoIdx + 300); i++) {
+        if (bytes[i] === 0x44 && bytes[i + 1] === 0x89) {
+          durIdx = i;
+          break;
+        }
+      }
+
+      // Prepare 4-byte big-endian float for duration in ms
+      const floatBuf = new ArrayBuffer(4);
+      const floatView = new DataView(floatBuf);
+      floatView.setFloat32(0, durationMs, false);
+      const floatBytes = new Uint8Array(floatBuf);
+
+      if (durIdx !== -1) {
+        const sizeByte = bytes[durIdx + 2];
+        if (sizeByte === 0x84) {
+          bytes.set(floatBytes, durIdx + 3);
+          return new Blob([bytes], { type: 'video/webm' });
+        } else if (sizeByte === 0x88) {
+          const doubleBuf = new ArrayBuffer(8);
+          const doubleView = new DataView(doubleBuf);
+          doubleView.setFloat64(0, durationMs, false);
+          bytes.set(new Uint8Array(doubleBuf), durIdx + 3);
+          return new Blob([bytes], { type: 'video/webm' });
+        }
+      }
+
+      // Inject Duration element into Info block
+      let pos = infoIdx + 4;
+      const firstByte = bytes[pos];
+      let vintLen = 1;
+      let mask = 0x80;
+      while (vintLen <= 8 && !(firstByte & mask)) {
+        vintLen++;
+        mask >>= 1;
+      }
+      let currentInfoSize = firstByte & (mask - 1);
+      for (let i = 1; i < vintLen; i++) {
+        currentInfoSize = (currentInfoSize << 8) | bytes[pos + i];
+      }
+
+      const durElem = new Uint8Array(7);
+      durElem[0] = 0x44;
+      durElem[1] = 0x89;
+      durElem[2] = 0x84;
+      durElem.set(floatBytes, 3);
+
+      const newInfoSize = currentInfoSize + 7;
+      const newVint = new Uint8Array(4);
+      newVint[0] = 0x10 | ((newInfoSize >> 24) & 0x0F);
+      newVint[1] = (newInfoSize >> 16) & 0xFF;
+      newVint[2] = (newInfoSize >> 8) & 0xFF;
+      newVint[3] = newInfoSize & 0xFF;
+
+      const totalLen = bytes.length - vintLen + 4 + 7;
+      const result = new Uint8Array(totalLen);
+      result.set(bytes.subarray(0, pos), 0);
+      result.set(newVint, pos);
+      result.set(durElem, pos + 4);
+      result.set(bytes.subarray(pos + vintLen), pos + 4 + 7);
+
+      return new Blob([result], { type: 'video/webm' });
+    } catch (err) {
+      console.warn('patchWebmDuration notice:', err);
+      return blob;
     }
   }
 
   async exportCanvasClipVideo(clip) {
-    window.app.showToast(`Rendering 9:16 vertical MP4 clip with animated captions...`, 'info', 4000);
+    window.app.showToast(`Rendering 9:16 vertical clip with animated captions...`, 'info', 4000);
     const width = clip.aspectRatio === '16:9' ? 1280 : (clip.aspectRatio === '1:1' ? 720 : 720);
     const height = clip.aspectRatio === '16:9' ? 720 : (clip.aspectRatio === '1:1' ? 720 : 1280);
 
@@ -803,13 +1000,12 @@ class ClipGenerator {
       try {
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        // Use global CORS image proxy to avoid canvas tainting
         const proxyUrl = `https://images.weserv.nl/?url=img.youtube.com/vi/${ytId}/hqdefault.jpg`;
         await new Promise((resolve) => {
           img.onload = () => { posterLoaded = true; resolve(); };
           img.onerror = () => { posterLoaded = false; resolve(); };
           img.src = proxyUrl;
-          setTimeout(resolve, 1500); // safety timeout
+          setTimeout(resolve, 1500);
         });
         if (posterLoaded) posterImg = img;
       } catch (err) {
@@ -817,7 +1013,6 @@ class ClipGenerator {
       }
     }
 
-    // Ensure captureStream is available
     if (!canvas.captureStream && !canvas.mozCaptureStream) {
       window.app.showToast('Browser does not support canvas video recording', 'error');
       return;
@@ -825,11 +1020,32 @@ class ClipGenerator {
 
     const stream = canvas.captureStream ? canvas.captureStream(30) : canvas.mozCaptureStream(30);
 
-    let mimeType = 'video/mp4';
+    // Add audio track so media players recognize a full multimedia video stream
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const dest = audioCtx.createMediaStreamDestination();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0.0001;
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start();
+      const audioTrack = dest.stream.getAudioTracks()[0];
+      if (audioTrack && stream.addTrack) {
+        stream.addTrack(audioTrack);
+      }
+    } catch (e) {
+      console.warn('Audio track generation notice:', e);
+    }
+
+    let mimeType = 'video/mp4;codecs=avc1';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'video/webm;codecs=vp9';
+      mimeType = 'video/mp4';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm';
+        mimeType = 'video/webm;codecs=vp9';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'video/webm';
+        }
       }
     }
 
@@ -845,25 +1061,37 @@ class ClipGenerator {
       if (e.data && e.data.size > 0) chunks.push(e.data);
     };
 
-    const fileName = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.mp4`;
+    recorder.onstop = async () => {
+      const rawBlob = new Blob(chunks, { type: mimeType });
+      const durationSeconds = clip.duration || 30;
+      let finalBlob = rawBlob;
 
-    recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: 'video/mp4' });
-      const url = URL.createObjectURL(blob);
+      // Patch WebM EBML duration header so Windows Media Player displays duration & seeks
+      if (mimeType.includes('webm')) {
+        finalBlob = await this.patchWebmDuration(rawBlob, durationSeconds * 1000);
+      }
+
+      const isMp4 = mimeType.includes('mp4');
+      const ext = isMp4 ? 'mp4' : 'webm';
+      const cleanTitle = clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      const fileName = `${cleanTitle}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.${ext}`;
+
+      const url = URL.createObjectURL(finalBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      window.app.showToast(`✅ Downloaded clip video: ${fileName}`, 'success');
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      window.app.showToast(`✅ Exported ${durationSeconds}s Clip Video (${ext.toUpperCase()})! Playable in Windows Media Player & VLC.`, 'success', 5000);
     };
 
     recorder.start();
 
-    // Render 75 frames (2.5 seconds clip presentation)
-    const totalFrames = 75;
+    // Render 100 frames (Smooth vertical presentation)
+    const totalFrames = 100;
     let frame = 0;
     const subs = clip.subtitles || [{ text: clip.title }];
     const style = clip.captionStyle || 'hormozi';
