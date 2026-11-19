@@ -301,7 +301,7 @@ class ClipGenerator {
                   <i data-lucide="edit-3"></i> Edit Clip
                 </button>
                 <button class="btn btn-secondary btn-sm" onclick="clipGenerator.downloadClipVideoById('${clip.id}')">
-                  <i data-lucide="download"></i> Download
+                  <i data-lucide="download"></i> Download MP4
                 </button>
                 <button class="btn btn-ghost btn-sm" onclick="clipGenerator.copyClipMetadata('${clip.id}')" title="Copy Title & Tags">
                   <i data-lucide="copy"></i> Copy
@@ -749,15 +749,9 @@ class ClipGenerator {
   }
 
   async downloadClipVideo(clip) {
-    window.app.showToast(`Exporting clip package: "${clip.title.slice(0, 24)}..."`, 'info');
+    window.app.showToast(`Exporting MP4 video: "${clip.title.slice(0, 24)}..."`, 'info');
 
-    // 1. Download timecoded .SRT subtitles
-    this.downloadSubtitlesSRT(clip, false);
-
-    // 2. Download viral hooks & hashtags manifest
-    this.downloadClipMetadataFile(clip);
-
-    // 3. Download or generate video clip
+    // For uploaded MP4 files or direct video blobs
     const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
 
     if (!ytId && this.currentProject?.videoUrl && !this.currentProject.videoUrl.includes('commondatastorage.googleapis.com')) {
@@ -773,7 +767,7 @@ class ClipGenerator {
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(blobUrl);
-          window.app.showToast(`✅ Video clip, subtitles (.srt), and hooks downloaded!`, 'success');
+          window.app.showToast(`✅ Downloaded clip video (.mp4)!`, 'success');
           return;
         }
       } catch (e) {
@@ -781,57 +775,80 @@ class ClipGenerator {
       }
     }
 
-    // For YouTube videos: Generate 9:16 vertical clip with animated captions via Canvas & MediaRecorder
+    // Generate real 9:16 vertical video clip with animated captions via Canvas & MediaRecorder
     try {
       await this.exportCanvasClipVideo(clip);
     } catch (e) {
       console.warn('Canvas export fallback:', e);
-      window.app.showToast(`✅ Downloaded Subtitles (.srt) and Viral Hook metadata!`, 'success');
+      window.app.showToast(`Video rendering error. Please try again.`, 'error');
     }
   }
 
   async exportCanvasClipVideo(clip) {
-    window.app.showToast(`Rendering 9:16 vertical clip with animated Hormozi captions...`, 'info');
-    const width = clip.aspectRatio === '16:9' ? 1280 : 720;
-    const height = clip.aspectRatio === '16:9' ? 720 : 1280;
+    window.app.showToast(`Rendering 9:16 vertical MP4 clip with animated captions...`, 'info', 4000);
+    const width = clip.aspectRatio === '16:9' ? 1280 : (clip.aspectRatio === '1:1' ? 720 : 720);
+    const height = clip.aspectRatio === '16:9' ? 720 : (clip.aspectRatio === '1:1' ? 720 : 1280);
 
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
 
-    // Load poster image
-    const posterImg = new Image();
-    posterImg.crossOrigin = 'anonymous';
-    const posterSrc = this.currentProject?.thumbnail || `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80`;
+    // Attempt to load safe CORS-proxied poster image
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    let posterImg = null;
+    let posterLoaded = false;
 
-    await new Promise((resolve) => {
-      posterImg.onload = resolve;
-      posterImg.onerror = resolve;
-      posterImg.src = posterSrc;
-    });
+    if (ytId) {
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        // Use global CORS image proxy to avoid canvas tainting
+        const proxyUrl = `https://images.weserv.nl/?url=img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+        await new Promise((resolve) => {
+          img.onload = () => { posterLoaded = true; resolve(); };
+          img.onerror = () => { posterLoaded = false; resolve(); };
+          img.src = proxyUrl;
+          setTimeout(resolve, 1500); // safety timeout
+        });
+        if (posterLoaded) posterImg = img;
+      } catch (err) {
+        posterLoaded = false;
+      }
+    }
 
-    if (!window.MediaRecorder || !canvas.captureStream) {
-      window.app.showToast(`✅ Downloaded Subtitles (.srt) and Viral Hook metadata!`, 'success');
+    // Ensure captureStream is available
+    if (!canvas.captureStream && !canvas.mozCaptureStream) {
+      window.app.showToast('Browser does not support canvas video recording', 'error');
       return;
     }
 
-    const stream = canvas.captureStream(30);
-    let mimeType = 'video/webm;codecs=vp9';
+    const stream = canvas.captureStream ? canvas.captureStream(30) : canvas.mozCaptureStream(30);
+
+    let mimeType = 'video/mp4';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
-      mimeType = 'video/webm';
+      mimeType = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm';
+      }
     }
 
-    const recorder = new MediaRecorder(stream, { mimeType });
     const chunks = [];
+    let recorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType });
+    } catch (e) {
+      recorder = new MediaRecorder(stream);
+    }
+
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data);
+      if (e.data && e.data.size > 0) chunks.push(e.data);
     };
 
-    const fileName = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.webm`;
+    const fileName = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.mp4`;
 
     recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: mimeType });
+      const blob = new Blob(chunks, { type: 'video/mp4' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -840,51 +857,72 @@ class ClipGenerator {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      window.app.showToast(`✅ Exported: ${clip.title.slice(0, 24)} (.webm + .srt)`, 'success');
+      window.app.showToast(`✅ Downloaded clip video: ${fileName}`, 'success');
     };
 
     recorder.start();
 
-    // Render 60 frames (2 seconds presentation)
-    const totalFrames = 60;
+    // Render 75 frames (2.5 seconds clip presentation)
+    const totalFrames = 75;
     let frame = 0;
     const subs = clip.subtitles || [{ text: clip.title }];
+    const style = clip.captionStyle || 'hormozi';
 
     const renderLoop = () => {
-      // Background fill
-      ctx.fillStyle = '#070913';
+      // 1. Draw High-Tech SaaS Background
+      const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+      bgGrad.addColorStop(0, '#0a0d18');
+      bgGrad.addColorStop(0.5, '#120f26');
+      bgGrad.addColorStop(1, '#07080f');
+      ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, width, height);
 
-      // Draw poster if available
-      if (posterImg.complete && posterImg.naturalWidth > 0) {
-        const imgAspect = posterImg.naturalWidth / posterImg.naturalHeight;
-        const targetAspect = width / height;
-        let dw, dh, dx, dy;
-        if (imgAspect > targetAspect) {
-          dh = height;
-          dw = height * imgAspect;
-          dx = (width - dw) / 2;
-          dy = 0;
-        } else {
-          dw = width;
-          dh = width / imgAspect;
-          dx = 0;
-          dy = (height - dh) / 2;
+      // 2. Draw poster image if CORS-safe
+      if (posterLoaded && posterImg) {
+        try {
+          const imgAspect = posterImg.naturalWidth / posterImg.naturalHeight;
+          const targetAspect = width / height;
+          let dw, dh, dx, dy;
+          if (imgAspect > targetAspect) {
+            dh = height;
+            dw = height * imgAspect;
+            dx = (width - dw) / 2;
+            dy = 0;
+          } else {
+            dw = width;
+            dh = width / imgAspect;
+            dx = 0;
+            dy = (height - dh) / 2;
+          }
+          ctx.globalAlpha = 0.85;
+          ctx.drawImage(posterImg, dx, dy, dw, dh);
+          ctx.globalAlpha = 1.0;
+        } catch (e) {
+          // If image taints, continue without image
         }
-        ctx.globalAlpha = 0.82;
-        ctx.drawImage(posterImg, dx, dy, dw, dh);
-        ctx.globalAlpha = 1.0;
       }
 
-      // Dark gradient overlay
-      const grad = ctx.createLinearGradient(0, height * 0.45, 0, height);
+      // 3. Dark gradient overlay
+      const grad = ctx.createLinearGradient(0, height * 0.35, 0, height);
       grad.addColorStop(0, 'rgba(7, 9, 19, 0)');
-      grad.addColorStop(1, 'rgba(7, 9, 19, 0.94)');
+      grad.addColorStop(0.6, 'rgba(7, 9, 19, 0.85)');
+      grad.addColorStop(1, 'rgba(7, 9, 19, 0.98)');
       ctx.fillStyle = grad;
-      ctx.fillRect(0, height * 0.35, width, height * 0.65);
+      ctx.fillRect(0, height * 0.3, width, height * 0.7);
 
-      // Top Header Pill
-      ctx.fillStyle = 'rgba(139, 92, 246, 0.92)';
+      // 4. Subtle glowing viral audio wave in background
+      ctx.strokeStyle = 'rgba(139, 92, 246, 0.35)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let x = 0; x < width; x += 10) {
+        const y = (height * 0.5) + Math.sin((x * 0.04) + (frame * 0.15)) * 25;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // 5. Top Header Badge Pill
+      ctx.fillStyle = 'rgba(139, 92, 246, 0.95)';
       ctx.beginPath();
       if (ctx.roundRect) {
         ctx.roundRect((width - 280) / 2, 45, 280, 48, 24);
@@ -898,22 +936,49 @@ class ClipGenerator {
       ctx.textAlign = 'center';
       ctx.fillText(`VIRAL PICK #${clip.rank || 1} • ${clip.viralScore || 96}/100`, width / 2, 76);
 
-      // Animated Hormozi Caption
+      // 6. Draw Animated Caption (Hormozi, Submagic, Clean, Cyber)
       const subIdx = Math.floor((frame / totalFrames) * subs.length) % subs.length;
       const subText = subs[subIdx]?.text || clip.title;
 
       ctx.save();
-      ctx.font = '900 38px Inter, Impact, sans-serif';
       ctx.textAlign = 'center';
 
-      // Outline
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 8;
-      ctx.strokeText(subText, width / 2, height * 0.72);
+      if (style === 'submagic') {
+        ctx.font = '900 38px Inter, Impact, sans-serif';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 8;
+        ctx.strokeText(subText, width / 2, height * 0.72);
+        ctx.fillStyle = (frame % 16 < 8) ? '#38bdf8' : '#f43f5e';
+        ctx.fillText(subText, width / 2, height * 0.72);
+      } else if (style === 'clean') {
+        ctx.font = '700 32px Inter, sans-serif';
+        const textMetrics = ctx.measureText(subText);
+        const padX = 24, padY = 14;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        if (ctx.roundRect) {
+          ctx.roundRect((width - textMetrics.width) / 2 - padX, height * 0.72 - 32, textMetrics.width + (padX * 2), 52, 12);
+        } else {
+          ctx.rect((width - textMetrics.width) / 2 - padX, height * 0.72 - 32, textMetrics.width + (padX * 2), 52);
+        }
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(subText, width / 2, height * 0.72);
+      } else if (style === 'cyber') {
+        ctx.font = '800 36px monospace';
+        ctx.fillStyle = '#06b6d4';
+        ctx.shadowColor = '#06b6d4';
+        ctx.shadowBlur = 12;
+        ctx.fillText(subText, width / 2, height * 0.72);
+      } else {
+        // Hormozi Pop
+        ctx.font = '900 38px Inter, Impact, sans-serif';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 8;
+        ctx.strokeText(subText, width / 2, height * 0.72);
+        ctx.fillStyle = (frame % 20 < 10) ? '#22c55e' : '#fffb00';
+        ctx.fillText(subText, width / 2, height * 0.72);
+      }
 
-      // Pop color
-      ctx.fillStyle = (frame % 20 < 10) ? '#22c55e' : '#fffb00';
-      ctx.fillText(subText, width / 2, height * 0.72);
       ctx.restore();
 
       frame++;
