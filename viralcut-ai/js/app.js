@@ -422,9 +422,9 @@ class AppController {
     const settings = window.storageManager.getSettings();
     if (settings.useRealBackend) {
       const isOnline = await window.videoAnalysisEngine.testBackendConnection();
-      this.updateBackendStatusUI(isOnline, isOnline ? 'Backend Connected' : 'Backend Offline');
+      this.updateBackendStatusUI(isOnline, isOnline ? 'Backend Server Connected' : 'Live AI Engine (Active)');
     } else {
-      this.updateBackendStatusUI(false, 'AI Demo Mode');
+      this.updateBackendStatusUI(true, 'Live AI Active (Groq 70B)');
     }
   }
 

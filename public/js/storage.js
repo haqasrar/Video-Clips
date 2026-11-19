@@ -31,7 +31,7 @@ const SEED_PROJECTS = [
     durationFormatted: '18:42',
     createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
     thumbnail: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=600&auto=format&fit=crop&q=80',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4',
     clipsCount: 5,
     highestScore: 96,
     clips: [
@@ -188,7 +188,7 @@ const SEED_PROJECTS = [
     durationFormatted: '15:04',
     createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
     thumbnail: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600&auto=format&fit=crop&q=80',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4',
     clipsCount: 4,
     highestScore: 95,
     clips: [
@@ -316,7 +316,7 @@ const SEED_PROJECTS = [
     durationFormatted: '42:15',
     createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
     thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    videoUrl: 'https://vjs.zencdn.net/v/oceans.mp4',
     clipsCount: 3,
     highestScore: 94,
     clips: [
@@ -416,9 +416,24 @@ class StorageManager {
 
   init() {
     const existing = localStorage.getItem(STORAGE_KEYS.PROJECTS);
-    // If empty or contains old demo data, initialize clean
     if (!existing || existing.includes('proj-hormozi-offer')) {
       localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify([]));
+    } else {
+      try {
+        const projects = JSON.parse(existing);
+        let changed = false;
+        projects.forEach(p => {
+          if (!p.videoUrl || p.videoUrl.includes('commondatastorage.googleapis.com') || p.videoUrl.includes('BigBuckBunny')) {
+            p.videoUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
+            changed = true;
+          }
+        });
+        if (changed) {
+          localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+        }
+      } catch (e) {
+        localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify([]));
+      }
     }
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
       this.saveSettings(DEFAULT_SETTINGS);
@@ -434,7 +449,7 @@ class StorageManager {
       // Auto-sanitize legacy broken Google Cloud Storage URLs
       let changed = false;
       projects.forEach(p => {
-        if (p.videoUrl && (p.videoUrl.includes('commondatastorage.googleapis.com') || p.videoUrl.includes('BigBuckBunny'))) {
+        if (!p.videoUrl || p.videoUrl.includes('commondatastorage.googleapis.com') || p.videoUrl.includes('BigBuckBunny')) {
           p.videoUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
           changed = true;
         }

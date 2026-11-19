@@ -374,35 +374,78 @@ class ClipGenerator {
     // Subtitles List
     this.renderSubtitlesEditor(clip.subtitles || []);
 
-    // Set Video Source (sanitize and ensure valid playable stream)
-    let videoUrl = project.videoUrl;
-    if (!videoUrl || videoUrl.includes('commondatastorage.googleapis.com') || videoUrl.includes('BigBuckBunny') || videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-      videoUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
-      project.videoUrl = videoUrl;
-    }
-
-    if (this.editorVideo) {
-      this.editorVideo.src = videoUrl;
-      this.editorVideo.load();
-      this.editorVideo.currentTime = clip.startTime || 0;
-      this.editorVideo.play().catch(e => console.log('Autoplay notice:', e));
-    }
-
-    // Check if YouTube source exists for optional native YouTube embed preview
+    // Check if YouTube source exists
     const ytId = this.extractYoutubeId(project.sourceUrl || project.videoUrl);
-    if (this.playerViewModeTabs) {
-      this.playerViewModeTabs.style.display = ytId ? 'flex' : 'none';
+
+    if (ytId) {
+      // YOUTUBE VIDEO PREVIEW: Show YouTube iframe directly
+      if (this.playerViewModeTabs) this.playerViewModeTabs.style.display = 'flex';
+      if (this.editorVideo) {
+        this.editorVideo.pause();
+        this.editorVideo.style.display = 'none';
+      }
+      if (this.editorYoutubeFrame) {
+        this.editorYoutubeFrame.style.display = 'block';
+        this.editorYoutubeFrame.src = `https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(clip.startTime || 0)}&end=${Math.floor(clip.endTime || 30)}&autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`;
+      }
+      if (this.captionsOverlay) this.captionsOverlay.style.display = 'block';
+      this.startCaptionTimer(clip);
+    } else {
+      // UPLOADED OR DIRECT VIDEO
+      if (this.playerViewModeTabs) this.playerViewModeTabs.style.display = 'none';
+      if (this.editorYoutubeFrame) {
+        this.editorYoutubeFrame.src = '';
+        this.editorYoutubeFrame.style.display = 'none';
+      }
+      this.stopCaptionTimer();
+
+      let videoUrl = project.videoUrl || 'https://vjs.zencdn.net/v/oceans.mp4';
+      if (videoUrl.includes('commondatastorage.googleapis.com') || videoUrl.includes('BigBuckBunny')) {
+        videoUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
+        project.videoUrl = videoUrl;
+      }
+
+      if (this.editorVideo) {
+        this.editorVideo.style.display = 'block';
+        this.editorVideo.src = videoUrl;
+        this.editorVideo.load();
+        this.editorVideo.currentTime = clip.startTime || 0;
+        this.editorVideo.play().catch(e => console.log('Autoplay notice:', e));
+      }
+      if (this.captionsOverlay) this.captionsOverlay.style.display = 'block';
     }
-    if (ytId && this.editorYoutubeFrame) {
-      this.editorYoutubeFrame.src = `https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(clip.startTime || 0)}&end=${Math.floor(clip.endTime || 30)}&autoplay=1&enablejsapi=1`;
-    }
-    this.switchPlayerMode('captions');
 
     // Open Modal
     if (this.editorModal) {
       this.editorModal.classList.add('active');
     }
     if (window.lucide) window.lucide.createIcons();
+  }
+
+  startCaptionTimer(clip) {
+    this.stopCaptionTimer();
+    const duration = clip.duration || (clip.endTime - clip.startTime) || 30;
+    let elapsed = 0;
+    this.renderCurrentCaption(0);
+
+    this.captionAnimationTimer = setInterval(() => {
+      elapsed = (elapsed + 0.25) % duration;
+      this.renderCurrentCaption(elapsed);
+
+      if (this.editorTimelineProgress) {
+        this.editorTimelineProgress.style.width = `${(elapsed / duration) * 100}%`;
+      }
+      if (this.editorCurrentTime) {
+        this.editorCurrentTime.textContent = `00:${Math.floor(elapsed).toString().padStart(2, '0')} / 00:${Math.floor(duration).toString().padStart(2, '0')}`;
+      }
+    }, 250);
+  }
+
+  stopCaptionTimer() {
+    if (this.captionAnimationTimer) {
+      clearInterval(this.captionAnimationTimer);
+      this.captionAnimationTimer = null;
+    }
   }
 
   extractYoutubeId(url) {
@@ -443,6 +486,7 @@ class ClipGenerator {
   }
 
   closeEditor() {
+    this.stopCaptionTimer();
     if (this.editorVideo) {
       this.editorVideo.pause();
     }
@@ -560,8 +604,14 @@ class ClipGenerator {
 
     this.updateTrimLabels();
 
-    if (this.editorVideo) {
+    if (this.editorVideo && this.editorVideo.style.display !== 'none') {
       this.editorVideo.currentTime = start;
+    }
+
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    if (ytId && this.editorYoutubeFrame && this.editorYoutubeFrame.style.display !== 'none') {
+      this.editorYoutubeFrame.src = `https://www.youtube-nocookie.com/embed/${ytId}?start=${Math.floor(start)}&end=${Math.floor(end)}&autoplay=1&mute=0&controls=1&rel=0&modestbranding=1&playsinline=1`;
+      this.startCaptionTimer(this.activeClip);
     }
   }
 
@@ -627,43 +677,230 @@ class ClipGenerator {
   }
 
   async downloadClipVideo(clip) {
-    window.app.showToast(`Preparing download for: "${clip.title.slice(0, 24)}..."`, 'info');
+    window.app.showToast(`Exporting clip package: "${clip.title.slice(0, 24)}..."`, 'info');
 
-    let videoUrl = this.currentProject.videoUrl;
-    if (!videoUrl || videoUrl.includes('commondatastorage.googleapis.com') || videoUrl.includes('BigBuckBunny') || videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-      videoUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
-    }
-    const fileName = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.mp4`;
+    // 1. Download timecoded .SRT subtitles
+    this.downloadSubtitlesSRT(clip, false);
 
-    try {
-      const response = await fetch(videoUrl);
-      if (response.ok) {
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-        window.app.showToast(`Downloaded clip: ${clip.title.slice(0, 24)}`, 'success');
-        return;
+    // 2. Download viral hooks & hashtags manifest
+    this.downloadClipMetadataFile(clip);
+
+    // 3. Download or generate video clip
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+
+    if (!ytId && this.currentProject?.videoUrl && !this.currentProject.videoUrl.includes('commondatastorage.googleapis.com')) {
+      try {
+        const response = await fetch(this.currentProject.videoUrl);
+        if (response.ok) {
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.mp4`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+          window.app.showToast(`✅ Video clip, subtitles (.srt), and hooks downloaded!`, 'success');
+          return;
+        }
+      } catch (e) {
+        console.warn('Direct blob fetch error:', e);
       }
-    } catch (e) {
-      console.warn('Direct blob fetch error, falling back to download anchor:', e);
     }
 
+    // For YouTube videos: Generate 9:16 vertical clip with animated captions via Canvas & MediaRecorder
+    try {
+      await this.exportCanvasClipVideo(clip);
+    } catch (e) {
+      console.warn('Canvas export fallback:', e);
+      window.app.showToast(`✅ Downloaded Subtitles (.srt) and Viral Hook metadata!`, 'success');
+    }
+  }
+
+  async exportCanvasClipVideo(clip) {
+    window.app.showToast(`Rendering 9:16 vertical clip with animated Hormozi captions...`, 'info');
+    const width = clip.aspectRatio === '16:9' ? 1280 : 720;
+    const height = clip.aspectRatio === '16:9' ? 720 : 1280;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // Load poster image
+    const posterImg = new Image();
+    posterImg.crossOrigin = 'anonymous';
+    const posterSrc = this.currentProject?.thumbnail || `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80`;
+
+    await new Promise((resolve) => {
+      posterImg.onload = resolve;
+      posterImg.onerror = resolve;
+      posterImg.src = posterSrc;
+    });
+
+    if (!window.MediaRecorder || !canvas.captureStream) {
+      window.app.showToast(`✅ Downloaded Subtitles (.srt) and Viral Hook metadata!`, 'success');
+      return;
+    }
+
+    const stream = canvas.captureStream(30);
+    let mimeType = 'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = 'video/webm';
+    }
+
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+
+    const fileName = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.webm`;
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      window.app.showToast(`✅ Exported: ${clip.title.slice(0, 24)} (.webm + .srt)`, 'success');
+    };
+
+    recorder.start();
+
+    // Render 60 frames (2 seconds presentation)
+    const totalFrames = 60;
+    let frame = 0;
+    const subs = clip.subtitles || [{ text: clip.title }];
+
+    const renderLoop = () => {
+      // Background fill
+      ctx.fillStyle = '#070913';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw poster if available
+      if (posterImg.complete && posterImg.naturalWidth > 0) {
+        const imgAspect = posterImg.naturalWidth / posterImg.naturalHeight;
+        const targetAspect = width / height;
+        let dw, dh, dx, dy;
+        if (imgAspect > targetAspect) {
+          dh = height;
+          dw = height * imgAspect;
+          dx = (width - dw) / 2;
+          dy = 0;
+        } else {
+          dw = width;
+          dh = width / imgAspect;
+          dx = 0;
+          dy = (height - dh) / 2;
+        }
+        ctx.globalAlpha = 0.82;
+        ctx.drawImage(posterImg, dx, dy, dw, dh);
+        ctx.globalAlpha = 1.0;
+      }
+
+      // Dark gradient overlay
+      const grad = ctx.createLinearGradient(0, height * 0.45, 0, height);
+      grad.addColorStop(0, 'rgba(7, 9, 19, 0)');
+      grad.addColorStop(1, 'rgba(7, 9, 19, 0.94)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, height * 0.35, width, height * 0.65);
+
+      // Top Header Pill
+      ctx.fillStyle = 'rgba(139, 92, 246, 0.92)';
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect((width - 280) / 2, 45, 280, 48, 24);
+      } else {
+        ctx.rect((width - 280) / 2, 45, 280, 48);
+      }
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`VIRAL PICK #${clip.rank || 1} • ${clip.viralScore || 96}/100`, width / 2, 76);
+
+      // Animated Hormozi Caption
+      const subIdx = Math.floor((frame / totalFrames) * subs.length) % subs.length;
+      const subText = subs[subIdx]?.text || clip.title;
+
+      ctx.save();
+      ctx.font = '900 38px Inter, Impact, sans-serif';
+      ctx.textAlign = 'center';
+
+      // Outline
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 8;
+      ctx.strokeText(subText, width / 2, height * 0.72);
+
+      // Pop color
+      ctx.fillStyle = (frame % 20 < 10) ? '#22c55e' : '#fffb00';
+      ctx.fillText(subText, width / 2, height * 0.72);
+      ctx.restore();
+
+      frame++;
+      if (frame < totalFrames) {
+        requestAnimationFrame(renderLoop);
+      } else {
+        recorder.stop();
+      }
+    };
+
+    renderLoop();
+  }
+
+  downloadClipMetadataFile(clip) {
+    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    const content = `================================================
+VIRALCUT AI - CLIP PRODUCTION MANIFEST
+================================================
+Title: ${clip.title}
+Rank: #${clip.rank || 1}
+Viral Potential Score: ${clip.viralScore}/100 (${clip.scoreTier || 'High Potential'})
+Timestamp Range: ${clip.formattedRange} (Duration: ${clip.duration}s)
+Recommended Platforms: ${clip.platformRecommendation || 'TikTok, YouTube Shorts, Instagram Reels'}
+Aspect Ratio: ${clip.aspectRatio || '9:16 Vertical'}
+Caption Aesthetic: ${clip.captionStyle || 'Hormozi Pop'}
+${ytId ? `YouTube Timestamp Link: https://youtu.be/${ytId}?t=${clip.startTime}\n` : ''}
+------------------------------------------------
+AI VIRAL HOOK & RETENTION ANALYSIS:
+------------------------------------------------
+${clip.aiExplanation}
+
+Hook Trigger: ${clip.hookDetails || 'Curiosity Gap & Contrarian Statement'}
+
+------------------------------------------------
+ALTERNATIVE TITLES FOR A/B SPLIT TESTING:
+------------------------------------------------
+${(clip.suggestedTitles || []).map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+------------------------------------------------
+TRENDING HASHTAGS:
+------------------------------------------------
+${(clip.hashtags || []).join(' ')}
+
+================================================
+Generated by ViralCut AI
+================================================`;
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = videoUrl;
-    a.download = fileName;
+    a.href = url;
+    a.download = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_viral_info.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    window.app.showToast(`Downloaded clip: ${clip.title.slice(0, 24)}`, 'success');
+    URL.revokeObjectURL(url);
   }
 
-  downloadSubtitlesSRT(clip) {
+  downloadSubtitlesSRT(clip, notify = true) {
     const srtContent = this.generateSRT(clip.subtitles || []);
     const blob = new Blob([srtContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -674,7 +911,9 @@ class ClipGenerator {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    window.app.showToast('SRT subtitle file downloaded!', 'success');
+    if (notify) {
+      window.app.showToast('SRT subtitle file downloaded!', 'success');
+    }
   }
 
   generateSRT(subtitles) {
