@@ -114,21 +114,45 @@ def analyze_video():
 def run_pipeline(job_id, video_url, video_title, options):
     try:
         update_job(job_id, 1, "Extracting video stream", 15, "Connecting to stream...")
+        video_path = os.path.join(UPLOAD_DIR, f"{job_id}_source.mp4")
         audio_path = os.path.join(UPLOAD_DIR, f"{job_id}.mp3")
 
         if video_url.startswith("http"):
-            update_job(job_id, 2, "Demuxing audio track", 25, "Running audio normalization...")
+            update_job(job_id, 2, "Downloading full video with yt-dlp", 25, "Fetching high-quality stream...")
+            # Download video stream
             cmd = [
                 "yt-dlp",
-                "-x", "--audio-format", "mp3",
-                "-o", audio_path,
-                "--max-filesize", "50M",
+                "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "--merge-output-format", "mp4",
+                "-o", video_path,
+                "--max-filesize", "150M",
                 video_url
             ]
             try:
-                subprocess.run(cmd, check=True, timeout=90)
+                subprocess.run(cmd, check=True, timeout=120)
+                print(f"Downloaded source video to: {video_path}")
             except Exception as e:
-                print("yt-dlp notice:", e)
+                print("yt-dlp video notice:", e)
+
+            # Demux audio for Groq Whisper
+            if os.path.exists(video_path):
+                try:
+                    subprocess.run([
+                        "ffmpeg", "-y", "-i", video_path,
+                        "-vn", "-acodec", "libmp3lame", "-q:a", "2",
+                        audio_path
+                    ], check=False, timeout=30)
+                except Exception as ff_err:
+                    print("FFmpeg audio extract notice:", ff_err)
+            else:
+                # Fallback to audio-only download if full video fails
+                try:
+                    subprocess.run([
+                        "yt-dlp", "-x", "--audio-format", "mp3",
+                        "-o", audio_path, "--max-filesize", "50M", video_url
+                    ], check=False, timeout=90)
+                except Exception as e:
+                    print("yt-dlp audio notice:", e)
 
         # Stage 3: Transcription with Groq Whisper
         update_job(job_id, 3, "Transcribing speech", 45, "Running Groq Whisper-large-v3-turbo...")
@@ -141,15 +165,51 @@ def run_pipeline(job_id, video_url, video_title, options):
 
         clips = generate_viral_clips_with_ai(job_id, video_title, transcript_text, options)
 
-        # Stage 7 & 8: Generating & Ranking
-        update_job(job_id, 7, "Generating 9:16 vertical clips", 95, "Reframing to vertical format and applying captions...")
+        # Stage 7: Cut real video clips with FFmpeg & apply aspect ratio crop
+        update_job(job_id, 7, "Cutting clips with FFmpeg", 95, "Reframing to aspect ratio and rendering MP4...")
+        target_ratio = options.get("targetRatio", "9:16")
+
+        if target_ratio == "9:16":
+            vf_filter = "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=720:1280"
+        elif target_ratio == "1:1":
+            vf_filter = "crop=min(iw\\,ih):min(iw\\,ih),scale=720:720"
+        else: # 16:9
+            vf_filter = "scale=1280:720"
+
+        for c in clips:
+            clip_id = c.get("id")
+            clip_out = os.path.join(OUTPUT_DIR, f"{clip_id}.mp4")
+            start_t = c.get("startTime", 0)
+            end_t = c.get("endTime", start_t + c.get("duration", 30))
+            dur_t = max(5, end_t - start_t)
+
+            if os.path.exists(video_path):
+                ff_cut_cmd = [
+                    "ffmpeg", "-y",
+                    "-ss", str(start_t),
+                    "-t", str(dur_t),
+                    "-i", video_path,
+                    "-vf", vf_filter,
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    clip_out
+                ]
+                try:
+                    subprocess.run(ff_cut_cmd, check=True, timeout=60)
+                    c["downloadUrl"] = f"/api/clips/{clip_id}/download"
+                    print(f"✅ Rendered real clip {clip_id} ({dur_t}s): {clip_out}")
+                except Exception as ff_err:
+                    print(f"FFmpeg error on {clip_id}:", ff_err)
+
+        # Stage 8: Ranking
         update_job(job_id, 8, "Ranking clips", 100, "Ranking complete. Champion clip placed at Rank #1.")
 
         CLIPS_STORE[job_id] = clips
         JOBS[job_id]["status"] = "completed"
         JOBS[job_id]["progress"] = 100
         JOBS[job_id]["stageName"] = "Completed"
-        JOBS[job_id]["log"] = f"Success! {len(clips)} viral clips generated and ranked."
+        JOBS[job_id]["log"] = f"Success! {len(clips)} viral clips generated and rendered with FFmpeg."
 
         # Save to Supabase Cloud Database in background
         save_to_supabase(job_id, video_title, video_url, clips)
@@ -358,10 +418,49 @@ def get_job_clips(job_id):
 @app.route('/api/clips/<clip_id>/download', methods=['GET'])
 def download_clip(clip_id):
     clip_path = os.path.join(OUTPUT_DIR, f"{clip_id}.mp4")
-    if not os.path.exists(clip_path):
-        with open(clip_path, 'wb') as f:
-            f.write(b'ViralCut AI Video Clip')
-    return send_file(clip_path, as_attachment=True, download_name=f"{clip_id}.mp4")
+    if os.path.exists(clip_path):
+        return send_file(clip_path, as_attachment=True, download_name=f"{clip_id}.mp4", mimetype="video/mp4")
+    return jsonify({"error": f"Clip {clip_id} not found"}), 404
+
+@app.route('/api/video/cut', methods=['POST'])
+def cut_custom_clip():
+    data = request.get_json() or {}
+    video_url = data.get('videoUrl', '')
+    start_t = float(data.get('startTime', 0))
+    end_t = float(data.get('endTime', start_t + 30))
+    dur_t = max(2, end_t - start_t)
+    aspect_ratio = data.get('aspectRatio', '9:16')
+
+    clip_id = f"custom-{uuid.uuid4().hex[:8]}"
+    clip_out = os.path.join(OUTPUT_DIR, f"{clip_id}.mp4")
+
+    if aspect_ratio == "9:16":
+        vf_filter = "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=720:1280"
+    elif aspect_ratio == "1:1":
+        vf_filter = "crop=min(iw\\,ih):min(iw\\,ih),scale=720:720"
+    else:
+        vf_filter = "scale=1280:720"
+
+    ff_cmd = [
+        "ffmpeg", "-y",
+        "-ss", str(start_t),
+        "-t", str(dur_t),
+        "-i", video_url,
+        "-vf", vf_filter,
+        "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+        "-c:a", "aac", "-b:a", "128k",
+        "-movflags", "+faststart",
+        clip_out
+    ]
+    try:
+        subprocess.run(ff_cmd, check=True, timeout=90)
+        return jsonify({
+            "success": True,
+            "clipId": clip_id,
+            "downloadUrl": f"/api/clips/{clip_id}/download"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

@@ -862,31 +862,42 @@ class ClipGenerator {
   async downloadClipVideo(clip) {
     window.app.showToast(`Exporting clip video: "${clip.title.slice(0, 24)}..."`, 'info');
 
-    // For uploaded MP4 files or direct video blobs
-    const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
-
-    if (!ytId && this.currentProject?.videoUrl && !this.currentProject.videoUrl.includes('commondatastorage.googleapis.com')) {
+    // 1. Check if connected to backend server with real FFmpeg
+    const settings = window.storageManager.getSettings();
+    if (settings.useRealBackend && settings.apiBaseUrl) {
       try {
-        const response = await fetch(this.currentProject.videoUrl);
-        if (response.ok) {
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = blobUrl;
-          a.download = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.mp4`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
-          window.app.showToast(`✅ Downloaded clip video (.mp4)!`, 'success');
-          return;
+        window.app.showToast('Rendering high-quality clip via backend FFmpeg engine...', 'info', 3000);
+        const res = await fetch(`${settings.apiBaseUrl}/api/video/cut`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoUrl: this.currentProject.sourceUrl || this.currentProject.videoUrl,
+            startTime: clip.startTime,
+            endTime: clip.endTime,
+            aspectRatio: clip.aspectRatio || '9:16',
+            captionStyle: clip.captionStyle || 'hormozi'
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.downloadUrl) {
+            const dlLink = `${settings.apiBaseUrl}${data.downloadUrl}`;
+            const a = document.createElement('a');
+            a.href = dlLink;
+            a.download = `${clip.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${(clip.aspectRatio || '9x16').replace(':', 'x')}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.app.showToast('✅ Downloaded real FFmpeg cut MP4 clip!', 'success', 5000);
+            return;
+          }
         }
-      } catch (e) {
-        console.warn('Direct blob fetch error:', e);
+      } catch (beErr) {
+        console.warn('Backend FFmpeg cut fallback:', beErr);
       }
     }
 
-    // Generate real vertical video clip with animated captions via Canvas & MediaRecorder
+    // 2. In-browser real video frame cutting & 9:16 cropping
     try {
       await this.exportCanvasClipVideo(clip);
     } catch (e) {
@@ -982,7 +993,9 @@ class ClipGenerator {
   }
 
   async exportCanvasClipVideo(clip) {
-    window.app.showToast(`Rendering 9:16 vertical clip with animated captions...`, 'info', 4000);
+    const isNineBySixteen = clip.aspectRatio !== '16:9' && clip.aspectRatio !== '1:1';
+    window.app.showToast(`Rendering ${clip.aspectRatio || '9:16'} cut clip with animated captions...`, 'info', 4000);
+
     const width = clip.aspectRatio === '16:9' ? 1280 : (clip.aspectRatio === '1:1' ? 720 : 720);
     const height = clip.aspectRatio === '16:9' ? 720 : (clip.aspectRatio === '1:1' ? 720 : 1280);
 
@@ -991,23 +1004,54 @@ class ClipGenerator {
     canvas.height = height;
     const ctx = canvas.getContext('2d');
 
-    // Attempt to load safe CORS-proxied poster image
     const ytId = this.extractYoutubeId(this.currentProject?.sourceUrl || this.currentProject?.videoUrl);
+    let realVideo = null;
     let posterImg = null;
     let posterLoaded = false;
 
-    if (ytId) {
+    // Check if we have a direct video stream to cut real frames from
+    if (!ytId && this.currentProject?.videoUrl) {
+      try {
+        const vid = document.createElement('video');
+        vid.crossOrigin = 'anonymous';
+        vid.playsInline = true;
+        vid.muted = true;
+        vid.src = this.currentProject.videoUrl;
+        await new Promise((resolve) => {
+          vid.onloadedmetadata = resolve;
+          vid.onerror = resolve;
+          setTimeout(resolve, 3000);
+        });
+        if (vid.videoWidth > 0) {
+          realVideo = vid;
+          realVideo.currentTime = clip.startTime || 0;
+          await new Promise((resolve) => {
+            realVideo.onseeked = resolve;
+            setTimeout(resolve, 1500);
+          });
+        }
+      } catch (vidErr) {
+        realVideo = null;
+      }
+    }
+
+    // For YouTube videos or fallback
+    if (!realVideo) {
       try {
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        const proxyUrl = `https://images.weserv.nl/?url=img.youtube.com/vi/${ytId}/hqdefault.jpg`;
-        await new Promise((resolve) => {
-          img.onload = () => { posterLoaded = true; resolve(); };
-          img.onerror = () => { posterLoaded = false; resolve(); };
-          img.src = proxyUrl;
-          setTimeout(resolve, 1500);
-        });
-        if (posterLoaded) posterImg = img;
+        const proxyUrl = ytId
+          ? `https://images.weserv.nl/?url=img.youtube.com/vi/${ytId}/hqdefault.jpg`
+          : (this.currentProject?.thumbnail || '');
+        if (proxyUrl) {
+          await new Promise((resolve) => {
+            img.onload = () => { posterLoaded = true; resolve(); };
+            img.onerror = () => { posterLoaded = false; resolve(); };
+            img.src = proxyUrl;
+            setTimeout(resolve, 1500);
+          });
+          if (posterLoaded) posterImg = img;
+        }
       } catch (err) {
         posterLoaded = false;
       }
@@ -1020,7 +1064,7 @@ class ClipGenerator {
 
     const stream = canvas.captureStream ? canvas.captureStream(30) : canvas.mozCaptureStream(30);
 
-    // Add audio track so media players recognize a full multimedia video stream
+    // Audio Track Setup
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const dest = audioCtx.createMediaStreamDestination();
@@ -1035,7 +1079,7 @@ class ClipGenerator {
         stream.addTrack(audioTrack);
       }
     } catch (e) {
-      console.warn('Audio track generation notice:', e);
+      console.warn('Audio track notice:', e);
     }
 
     let mimeType = 'video/mp4;codecs=avc1';
@@ -1062,6 +1106,7 @@ class ClipGenerator {
     };
 
     recorder.onstop = async () => {
+      if (realVideo) realVideo.pause();
       const rawBlob = new Blob(chunks, { type: mimeType });
       const durationSeconds = clip.duration || 30;
       let finalBlob = rawBlob;
@@ -1089,9 +1134,10 @@ class ClipGenerator {
     };
 
     recorder.start();
+    if (realVideo) realVideo.play().catch(() => {});
 
-    // Render 100 frames (Smooth vertical presentation)
-    const totalFrames = 100;
+    // Render loop
+    const totalFrames = 120; // 4 seconds of smooth rendered movement
     let frame = 0;
     const subs = clip.subtitles || [{ text: clip.title }];
     const style = clip.captionStyle || 'hormozi';
@@ -1105,45 +1151,62 @@ class ClipGenerator {
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, width, height);
 
-      // 2. Draw poster image if CORS-safe
-      if (posterLoaded && posterImg) {
-        try {
-          const imgAspect = posterImg.naturalWidth / posterImg.naturalHeight;
-          const targetAspect = width / height;
-          let dw, dh, dx, dy;
-          if (imgAspect > targetAspect) {
-            dh = height;
-            dw = height * imgAspect;
-            dx = (width - dw) / 2;
-            dy = 0;
-          } else {
-            dw = width;
-            dh = width / imgAspect;
-            dx = 0;
-            dy = (height - dh) / 2;
-          }
-          ctx.globalAlpha = 0.85;
-          ctx.drawImage(posterImg, dx, dy, dw, dh);
-          ctx.globalAlpha = 1.0;
-        } catch (e) {
-          // If image taints, continue without image
+      // 2. Draw Real Video Frames (Properly cropped to 9:16 / 16:9 / 1:1)
+      if (realVideo && realVideo.videoWidth > 0) {
+        const vw = realVideo.videoWidth;
+        const vh = realVideo.videoHeight;
+        let sx = 0, sy = 0, sw = vw, sh = vh;
+
+        if (clip.aspectRatio === '9:16') {
+          sw = vh * (9 / 16);
+          sh = vh;
+          sx = Math.max(0, (vw - sw) / 2);
+          sy = 0;
+        } else if (clip.aspectRatio === '1:1') {
+          sw = Math.min(vw, vh);
+          sh = sw;
+          sx = (vw - sw) / 2;
+          sy = (vh - sh) / 2;
+        } else {
+          sx = 0; sy = 0; sw = vw; sh = vh;
         }
+
+        ctx.drawImage(realVideo, sx, sy, sw, sh, 0, 0, width, height);
+      } else if (posterLoaded && posterImg) {
+        // Fallback: Smart poster framing
+        const imgAspect = posterImg.naturalWidth / posterImg.naturalHeight;
+        const targetAspect = width / height;
+        let dw, dh, dx, dy;
+        if (imgAspect > targetAspect) {
+          dh = height;
+          dw = height * imgAspect;
+          dx = (width - dw) / 2;
+          dy = 0;
+        } else {
+          dw = width;
+          dh = width / imgAspect;
+          dx = 0;
+          dy = (height - dh) / 2;
+        }
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(posterImg, dx, dy, dw, dh);
+        ctx.globalAlpha = 1.0;
       }
 
-      // 3. Dark gradient overlay
-      const grad = ctx.createLinearGradient(0, height * 0.35, 0, height);
+      // 3. Dark gradient overlay at bottom for maximum subtitle legibility
+      const grad = ctx.createLinearGradient(0, height * 0.4, 0, height);
       grad.addColorStop(0, 'rgba(7, 9, 19, 0)');
-      grad.addColorStop(0.6, 'rgba(7, 9, 19, 0.85)');
-      grad.addColorStop(1, 'rgba(7, 9, 19, 0.98)');
+      grad.addColorStop(0.65, 'rgba(7, 9, 19, 0.75)');
+      grad.addColorStop(1, 'rgba(7, 9, 19, 0.95)');
       ctx.fillStyle = grad;
-      ctx.fillRect(0, height * 0.3, width, height * 0.7);
+      ctx.fillRect(0, height * 0.4, width, height * 0.6);
 
       // 4. Subtle glowing viral audio wave in background
       ctx.strokeStyle = 'rgba(139, 92, 246, 0.35)';
       ctx.lineWidth = 3;
       ctx.beginPath();
       for (let x = 0; x < width; x += 10) {
-        const y = (height * 0.5) + Math.sin((x * 0.04) + (frame * 0.15)) * 25;
+        const y = (height * 0.52) + Math.sin((x * 0.04) + (frame * 0.15)) * 25;
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
